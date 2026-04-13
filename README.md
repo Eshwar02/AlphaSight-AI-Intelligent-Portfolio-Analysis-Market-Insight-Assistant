@@ -2,7 +2,7 @@
 
 **Intelligent Portfolio Analysis & Market Insight Assistant**
 
-AlphaSight AI is a production-ready, full-stack financial intelligence platform that combines real-time market data, AI-powered analysis, portfolio tracking, watchlists, and automated daily briefings in a premium chat-first experience.
+AlphaSight AI is an intelligent stock market copilot that delivers deep company analysis, portfolio memory, geopolitical risk mapping, and AI-powered verdicts for smarter investing decisions.
 
 ---
 
@@ -14,7 +14,7 @@ AlphaSight AI is a production-ready, full-stack financial intelligence platform 
 - **Watchlist tracking** with real-time quote updates
 - **Daily portfolio brief generation** on-demand and scheduled (Vercel cron)
 - **Secure auth + RLS data isolation** via Supabase (email/password + Google OAuth)
-- **Modern UI/UX** built with Next.js App Router, Tailwind, Framer Motion, and markdown-rich chat rendering
+- **Modern UX** with Next.js App Router, Tailwind, Framer Motion, and markdown-rich chat rendering
 
 ---
 
@@ -35,20 +35,10 @@ AlphaSight AI is a production-ready, full-stack financial intelligence platform 
 
 ## Core Product Surfaces
 
-- **Chat Workspace (`/`)**
-  - Contextual financial chat + stock analysis
-  - Conversation history persistence
-  - Streaming model output
-- **Portfolio (`/portfolio`)**
-  - Add/edit/remove holdings
-  - Real-time valuation and P&L
-  - Best/worst performer summaries
-- **Watchlist (`/watchlist`)**
-  - Add/remove symbols
-  - Live quote movement monitoring
-- **Daily Brief (`/daily-brief`)**
-  - AI-generated market + portfolio briefing
-  - Snapshot analytics and previous brief history
+- **Chat Workspace (`/`)**: contextual financial chat, stock analysis, streaming responses, saved conversation history
+- **Portfolio (`/portfolio`)**: holdings CRUD, real-time valuation, P&L insights, best/worst performers
+- **Watchlist (`/watchlist`)**: symbol tracking with live quote movement
+- **Daily Brief (`/daily-brief`)**: generated market + portfolio brief with historical brief timeline
 
 ---
 
@@ -56,9 +46,9 @@ AlphaSight AI is a production-ready, full-stack financial intelligence platform 
 
 ```text
 UI (Next.js App Router + Zustand)
-   ├─ /api/chat                 -> Symbol detection -> Market data + news + risks -> Groq stream
-   ├─ /api/portfolio            -> CRUD holdings + valuation
-   ├─ /api/watchlist            -> CRUD watchlist + live quote enrich
+   ├─ /api/chat                 -> Symbol detection -> Data/news/risks -> Groq stream
+   ├─ /api/portfolio            -> Holdings CRUD + valuation
+   ├─ /api/watchlist            -> Watchlist CRUD + quote enrich
    ├─ /api/daily-brief          -> Snapshot build + AI brief generation
    └─ /api/conversations/*      -> Conversation/message persistence
 
@@ -72,7 +62,7 @@ Supabase
 
 ## Database
 
-Schema is provided in:
+Database schema is provided in:
 
 ```bash
 supabase/schema.sql
@@ -87,18 +77,13 @@ Main tables:
 - `daily_briefs`
 - `user_preferences`
 
-The schema includes:
-
-- Enum types (`message_role`, `market_type`)
-- Indexes for key query paths
-- `updated_at` trigger automation
-- Full Row-Level Security policies
+Schema includes enum types, indexes, `updated_at` triggers, and full Row-Level Security policies.
 
 ---
 
 ## Environment Variables
 
-Create `.env.local` in the project root:
+Create `.env.local`:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
@@ -113,8 +98,6 @@ NEWSDATA_API_KEY=
 CRON_SECRET=
 ```
 
-> `SUPABASE_SERVICE_ROLE_KEY` is required for admin-mode daily brief generation via secure cron.
-
 ---
 
 ## Local Development
@@ -124,13 +107,9 @@ npm install
 npm run dev
 ```
 
-Open:
+Open `http://localhost:3000`.
 
-```text
-http://localhost:3000
-```
-
-Production build:
+Production:
 
 ```bash
 npm run build
@@ -145,14 +124,14 @@ npm run start
 |---|---|---|
 | `/api/chat` | POST | Streaming AI chat + stock analysis context |
 | `/api/conversations` | GET, POST | List/create conversations |
-| `/api/conversations/[id]` | GET, DELETE | Retrieve/delete single conversation |
-| `/api/conversations/[id]/messages` | GET | Conversation messages (paginated) |
+| `/api/conversations/[id]` | GET, DELETE | Retrieve/delete a conversation |
+| `/api/conversations/[id]/messages` | GET | Paginated messages |
 | `/api/portfolio` | GET, POST | Holdings list/create |
 | `/api/portfolio/[id]` | PUT, DELETE | Update/delete holding |
 | `/api/watchlist` | GET, POST, DELETE | Watchlist operations |
-| `/api/stock/search` | GET | Symbol autocomplete/search |
-| `/api/stock/quote` | GET | Quick quote lookup |
-| `/api/daily-brief` | GET, POST | Fetch/generate daily briefs |
+| `/api/stock/search` | GET | Symbol search/autocomplete |
+| `/api/stock/quote` | GET | Quick quote |
+| `/api/daily-brief` | GET, POST | Fetch/generate briefs |
 
 ---
 
@@ -168,10 +147,10 @@ Configured in `vercel.json`:
 }
 ```
 
-The endpoint supports:
+Modes:
 
-1. **Authenticated user mode**: generate brief for the current user
-2. **Cron/admin mode**: generate briefs for all users with holdings (requires `CRON_SECRET`)
+1. **User mode** (authenticated): generate brief for current user
+2. **Cron/admin mode** (secure): generate briefs for all users with holdings
 
 ---
 
@@ -179,8 +158,8 @@ The endpoint supports:
 
 - Middleware-protected routes with session refresh
 - Supabase Auth for identity
-- Strict per-user access enforcement with RLS
-- Server-side admin client isolated to trusted contexts only
+- Per-user data isolation via RLS
+- Service-role client restricted to trusted server contexts
 
 ---
 
@@ -189,10 +168,10 @@ The endpoint supports:
 ```text
 src/
   app/
-    (app)/                 # Authenticated app pages
-    api/                   # Route handlers
+    (app)/                 # authenticated pages
+    api/                   # route handlers
     auth/callback/         # OAuth callback
-    login/, signup/        # Auth pages
+    login/, signup/        # auth pages
   components/
     chat/, layout/, portfolio/, ui/
   lib/
@@ -209,11 +188,5 @@ supabase/
 
 ## Status
 
-✅ Build, type-check, and lint pass in production build mode.
-
----
-
-## License
-
-This project is currently unlicensed. Add a `LICENSE` file if you want to define reuse terms.
+✅ Production build passes successfully.
 
