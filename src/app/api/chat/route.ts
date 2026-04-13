@@ -15,6 +15,28 @@ const STOCK_KEYWORDS =
 const COMPANY_NAMES =
   /\b(apple|microsoft|google|alphabet|amazon|tesla|meta|facebook|nvidia|netflix|amd|intel|disney|walmart|jpmorgan|coca.cola|pepsi|boeing|nike|visa|mastercard|paypal|salesforce|adobe|spotify|uber|airbnb|snowflake|palantir|coinbase|shopify|zoom|oracle|ibm|qualcomm|broadcom|berkshire|reliance|tcs|infosys|wipro|hdfc|tata)\b/i;
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 /**
  * Detect if a user message is asking about a specific stock.
  * Returns the extracted query for symbol resolution, or null.
@@ -168,55 +190,82 @@ export async function POST(request: NextRequest) {
       // Resolve the symbol
       const symbol = await resolveSymbol(stockQuery);
 
-      if (symbol) {
-        try {
-          // Fetch all stock data in parallel
-          const [quote, history, companyInfo, news] = await Promise.all([
-            fetchQuote(symbol),
-            fetchHistory(symbol),
-            fetchCompanyInfo(symbol),
-            fetchStockNews(symbol),
-          ]);
+        if (symbol) {
+          try {
+            const quote = await withTimeout(fetchQuote(symbol), 8000, "quote");
+            if (!quote) throw new Error("Quote not found");
 
-          if (!quote) throw new Error('Quote not found');
+            const [historyResult, companyInfoResult, newsResult] =
+              await Promise.allSettled([
+                withTimeout(fetchHistory(symbol), 12000, "history"),
+                withTimeout(fetchCompanyInfo(symbol), 8000, "companyInfo"),
+                withTimeout(fetchStockNews(symbol), 8000, "news"),
+              ]);
 
-          const technicals = analyzeTechnicals(history, quote.price);
-          const macroRisks = assessMacroRisks(
-            symbol,
-            companyInfo.sector,
-            companyInfo.country
+            const history =
+              historyResult.status === "fulfilled" ? historyResult.value : [];
+            const companyInfo =
+              companyInfoResult.status === "fulfilled"
+                ? companyInfoResult.value
+                : {
+                    sector: "Unknown",
+                    industry: "Unknown",
+                    description: "",
+                    employees: null,
+                    website: "",
+                    country: "",
+                  };
+            const news = newsResult.status === "fulfilled" ? newsResult.value : [];
+
+            const technicals = analyzeTechnicals(history, quote.price);
+            const macroRisks = assessMacroRisks(
+              symbol,
+              companyInfo.sector,
+              companyInfo.country
+            );
+            const rawMaterialRisks = assessRawMaterialRisks(
+              symbol,
+              companyInfo.sector
+            );
+
+            stockAnalysis = {
+              quote,
+              history,
+              technicals,
+              news,
+              macroRisks,
+              rawMaterialRisks,
+            };
+
+            stream = await withTimeout(
+              streamStockAnalysis(message, stockAnalysis, conversationHistory),
+              20000,
+              "stockAnalysisStream"
+            );
+          } catch {
+            // If stock data fetch fails, fall back to general chat
+            stream = await withTimeout(
+              streamGeneralChat(message, conversationHistory),
+              20000,
+              "generalChatStreamFallback"
+            );
+          }
+        } else {
+          // Symbol not resolved, fall back to general chat
+          stream = await withTimeout(
+            streamGeneralChat(message, conversationHistory),
+            20000,
+            "generalChatStreamNoSymbol"
           );
-          const rawMaterialRisks = assessRawMaterialRisks(
-            symbol,
-            companyInfo.sector
-          );
-
-          stockAnalysis = {
-            quote,
-            history,
-            technicals,
-            news,
-            macroRisks,
-            rawMaterialRisks,
-          };
-
-          stream = await streamStockAnalysis(
-            message,
-            stockAnalysis,
-            conversationHistory
-          );
-        } catch {
-          // If stock data fetch fails, fall back to general chat
-          stream = await streamGeneralChat(message, conversationHistory);
         }
       } else {
-        // Symbol not resolved, fall back to general chat
-        stream = await streamGeneralChat(message, conversationHistory);
+        // General financial chat
+        stream = await withTimeout(
+          streamGeneralChat(message, conversationHistory),
+          20000,
+          "generalChatStream"
+        );
       }
-    } else {
-      // General financial chat
-      stream = await streamGeneralChat(message, conversationHistory);
-    }
 
     // Create a tee to capture the full response for saving to DB
     const [streamForClient, streamForCapture] = stream.tee();

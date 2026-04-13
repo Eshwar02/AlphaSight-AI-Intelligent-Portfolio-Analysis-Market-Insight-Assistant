@@ -49,6 +49,11 @@ export function useChat() {
 
       const abortController = new AbortController();
       abortRef.current = abortController;
+      let didTimeout = false;
+      const timeoutId = setTimeout(() => {
+        didTimeout = true;
+        abortController.abort();
+      }, 60000);
 
       try {
         const res = await fetch('/api/chat', {
@@ -97,7 +102,9 @@ export function useChat() {
         if (err instanceof DOMException && err.name === 'AbortError') {
           updateMessage(assistantMsg.id, {
             isStreaming: false,
-            content: 'Response was cancelled.',
+            content: didTimeout
+              ? 'The response timed out. Please try again.'
+              : 'Response was cancelled.',
           });
         } else {
           updateMessage(assistantMsg.id, {
@@ -106,6 +113,7 @@ export function useChat() {
           });
         }
       } finally {
+        clearTimeout(timeoutId);
         setIsStreaming(false);
         abortRef.current = null;
       }
