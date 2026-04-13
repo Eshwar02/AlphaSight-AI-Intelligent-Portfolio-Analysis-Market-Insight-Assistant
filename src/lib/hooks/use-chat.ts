@@ -66,6 +66,11 @@ export function useChat() {
           signal: abortController.signal,
         });
 
+        const contentType = res.headers.get('content-type') || '';
+        if (res.redirected || contentType.includes('text/html')) {
+          throw new Error('AUTH_REDIRECT');
+        }
+
         if (!res.ok) {
           throw new Error(`Chat request failed: ${res.status}`);
         }
@@ -107,9 +112,13 @@ export function useChat() {
               : 'Response was cancelled.',
           });
         } else {
+          const message =
+            err instanceof Error && err.message === 'AUTH_REDIRECT'
+              ? 'Your session expired. Please log in again.'
+              : 'Sorry, something went wrong. Please try again.';
           updateMessage(assistantMsg.id, {
             isStreaming: false,
-            content: 'Sorry, something went wrong. Please try again.',
+            content: message,
           });
         }
       } finally {
