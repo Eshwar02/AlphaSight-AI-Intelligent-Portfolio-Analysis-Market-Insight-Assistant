@@ -4,10 +4,26 @@ import type { StockAnalysis } from "@/types/stock";
 
 let groqClient: Groq | null = null;
 
+function normalizeApiKey(rawValue: string | undefined): string {
+  const trimmed = rawValue?.trim() ?? "";
+  if (!trimmed) return "";
+
+  const wrappedInDoubleQuotes =
+    trimmed.startsWith('"') && trimmed.endsWith('"');
+  const wrappedInSingleQuotes =
+    trimmed.startsWith("'") && trimmed.endsWith("'");
+
+  if (wrappedInDoubleQuotes || wrappedInSingleQuotes) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
+}
+
 function getGroqClient(): Groq {
   if (groqClient) return groqClient;
 
-  const apiKey = process.env.GROQ_API_KEY?.trim();
+  const apiKey = normalizeApiKey(process.env.GROQ_API_KEY);
   if (!apiKey) {
     throw new Error("GROQ_API_KEY is not configured");
   }
