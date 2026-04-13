@@ -2,9 +2,19 @@ import Groq from "groq-sdk";
 import { STOCK_ANALYSIS_SYSTEM_PROMPT, DAILY_BRIEF_PROMPT } from "./prompts";
 import type { StockAnalysis } from "@/types/stock";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY!,
-});
+let groqClient: Groq | null = null;
+
+function getGroqClient(): Groq {
+  if (groqClient) return groqClient;
+
+  const apiKey = process.env.GROQ_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("GROQ_API_KEY is not configured");
+  }
+
+  groqClient = new Groq({ apiKey });
+  return groqClient;
+}
 
 const MODEL = "llama-3.3-70b-versatile";
 
@@ -105,7 +115,7 @@ export async function streamStockAnalysis(
 
   messages.push({ role: "user", content: message });
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroqClient().chat.completions.create({
     model: MODEL,
     messages,
     temperature: 0.7,
@@ -150,7 +160,7 @@ export async function streamGeneralChat(
 
   messages.push({ role: "user", content: message });
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroqClient().chat.completions.create({
     model: MODEL,
     messages,
     temperature: 0.7,
@@ -261,7 +271,7 @@ export function streamAnalysis(data: StockAnalysis): ReadableStream<Uint8Array> 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const stream = await groq.chat.completions.create({
+        const stream = await getGroqClient().chat.completions.create({
           model: MODEL,
           messages: [
             { role: "system", content: STOCK_ANALYSIS_SYSTEM_PROMPT },
@@ -302,7 +312,7 @@ export async function generateAnalysis(data: StockAnalysis): Promise<string> {
   const userPrompt = buildAnalysisPrompt(data);
 
   try {
-    const response = await groq.chat.completions.create({
+    const response = await getGroqClient().chat.completions.create({
       model: MODEL,
       messages: [
         { role: "system", content: STOCK_ANALYSIS_SYSTEM_PROMPT },
@@ -326,7 +336,7 @@ export async function generateAnalysis(data: StockAnalysis): Promise<string> {
  * Generate a daily brief summary (non-streaming, returns full text).
  */
 export async function generateDailyBrief(prompt: string): Promise<string> {
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroqClient().chat.completions.create({
     model: MODEL,
     messages: [
       {

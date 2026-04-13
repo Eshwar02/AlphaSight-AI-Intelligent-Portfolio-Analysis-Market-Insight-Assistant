@@ -37,6 +37,53 @@ function withTimeout<T>(
   });
 }
 
+function withStreamTimeout(
+  stream: ReadableStream<Uint8Array>,
+  timeoutMs: number,
+  label: string
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = stream.getReader();
+
+      try {
+        while (true) {
+          const next = await Promise.race<ReadableStreamReadResult<Uint8Array> | null>([
+            reader.read(),
+            new Promise<null>((resolve) => {
+              setTimeout(() => resolve(null), timeoutMs);
+            }),
+          ]);
+
+          if (next === null) {
+            controller.enqueue(
+              encoder.encode(
+                "\n\nThe model response timed out. Please try again."
+              )
+            );
+            await reader.cancel(`${label} timed out`);
+            controller.close();
+            return;
+          }
+
+          if (next.done) {
+            controller.close();
+            return;
+          }
+
+          controller.enqueue(next.value);
+        }
+      } catch (error) {
+        controller.error(error);
+      } finally {
+        reader.releaseLock();
+      }
+    },
+  });
+}
+
 /**
  * Detect if a user message is asking about a specific stock.
  * Returns the extracted query for symbol resolution, or null.
@@ -267,8 +314,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
+    const guardedStream = withStreamTimeout(stream, 25000, "chatStream");
+
     // Create a tee to capture the full response for saving to DB
-    const [streamForClient, streamForCapture] = stream.tee();
+    const [streamForClient, streamForCapture] = guardedStream.tee();
 
     // Save the AI response asynchronously after streaming completes
     const saveResponsePromise = (async () => {
