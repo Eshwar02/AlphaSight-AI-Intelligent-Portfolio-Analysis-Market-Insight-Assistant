@@ -230,6 +230,7 @@ export async function POST(request: NextRequest) {
 
     // Detect if this is a stock query
     const stockQuery = detectStockQuery(message);
+    console.log(`[chat] user=${user.id} stockQuery=${stockQuery} msg="${message.slice(0, 80)}"`);
     let stockAnalysis: StockAnalysis | null = null;
     let stream: ReadableStream<Uint8Array>;
 
@@ -403,6 +404,7 @@ export async function POST(request: NextRequest) {
         "Transfer-Encoding": "chunked",
         "X-Conversation-Id": activeConversationId!,
         "X-Has-Stock-Data": stockAnalysis ? "true" : "false",
+        "Access-Control-Expose-Headers": "X-Conversation-Id, X-Has-Stock-Data",
       },
     });
   } catch (error) {

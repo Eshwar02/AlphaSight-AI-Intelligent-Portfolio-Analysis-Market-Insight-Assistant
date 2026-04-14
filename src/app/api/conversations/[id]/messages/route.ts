@@ -47,7 +47,7 @@ export async function GET(
     // Fetch messages
     const { data: messages, error: msgError, count } = await supabase
       .from("messages")
-      .select("id, role, content, metadata, created_at", { count: "exact" })
+      .select("id, conversation_id, role, content, metadata, created_at", { count: "exact" })
       .eq("conversation_id", id)
       .order("created_at", { ascending: true })
       .range(offset, offset + limit - 1);

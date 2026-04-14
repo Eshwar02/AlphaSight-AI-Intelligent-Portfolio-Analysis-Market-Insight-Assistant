@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Menu, LogOut, User, ChevronLeft } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
+import { Menu, LogOut, User } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
+import { createClient } from '@/lib/supabase/client';
 
 export function Header() {
+  const router = useRouter();
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [initial, setInitial] = useState('A');
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* Close dropdown on outside click */
@@ -21,6 +24,25 @@ export function Header() {
     if (menuOpen) document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    void supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      const source = user?.user_metadata?.full_name || user?.email || 'A';
+      const first = source.trim().charAt(0).toUpperCase();
+      if (first) setInitial(first);
+    });
+  }, []);
+
+  async function handleSignOut() {
+    setMenuOpen(false);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace('/login');
+    router.refresh();
+  }
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-dark-700/50 bg-dark-900 px-3">
@@ -51,14 +73,17 @@ export function Header() {
           className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-green text-sm font-semibold text-dark-950 transition-opacity hover:opacity-90"
           aria-label="User menu"
         >
-          A
+          {initial}
         </button>
 
         {menuOpen && (
           <div className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-lg border border-dark-700 bg-dark-800 py-1 shadow-xl">
             <button
               className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-300 transition-colors hover:bg-dark-850"
-              onClick={() => setMenuOpen(false)}
+              onClick={() => {
+                setMenuOpen(false);
+                router.push('/settings');
+              }}
             >
               <User size={15} />
               <span>Profile</span>
@@ -66,10 +91,7 @@ export function Header() {
             <div className="my-1 border-t border-dark-700" />
             <button
               className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-400 transition-colors hover:bg-dark-850"
-              onClick={() => {
-                setMenuOpen(false);
-                /* Sign out logic handled by auth layer */
-              }}
+              onClick={() => void handleSignOut()}
             >
               <LogOut size={15} />
               <span>Sign Out</span>

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -82,6 +82,7 @@ function MobileBackdrop({ onClick }: { onClick: () => void }) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const conversations = useAppStore((s) => s.conversations);
@@ -94,8 +95,11 @@ export function Sidebar() {
 
   const handleNewChat = useCallback(() => {
     createNewChat();
+    if (pathname !== '/') {
+      router.push('/');
+    }
     if (window.innerWidth < 768) toggleSidebar();
-  }, [createNewChat, toggleSidebar]);
+  }, [createNewChat, pathname, router, toggleSidebar]);
 
   const handleSelectChat = useCallback(
     (id: string) => {

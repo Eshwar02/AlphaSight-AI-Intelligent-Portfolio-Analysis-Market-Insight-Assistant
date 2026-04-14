@@ -23,7 +23,7 @@ export async function GET(
     // Fetch conversation
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
-      .select("id, title, created_at, updated_at")
+      .select("id, user_id, title, created_at, updated_at")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
@@ -38,7 +38,7 @@ export async function GET(
     // Fetch messages
     const { data: messages, error: msgError } = await supabase
       .from("messages")
-      .select("id, role, content, metadata, created_at")
+      .select("id, conversation_id, role, content, metadata, created_at")
       .eq("conversation_id", id)
       .order("created_at", { ascending: true });
 

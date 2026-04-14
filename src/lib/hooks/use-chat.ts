@@ -104,6 +104,7 @@ export function useChat() {
 
         updateMessage(assistantMsg.id, { isStreaming: false });
       } catch (err: unknown) {
+        console.error('[useChat] sendMessage error:', err);
         if (err instanceof DOMException && err.name === 'AbortError') {
           updateMessage(assistantMsg.id, {
             isStreaming: false,
@@ -112,10 +113,10 @@ export function useChat() {
               : 'Response was cancelled.',
           });
         } else {
-          const message =
-            err instanceof Error && err.message === 'AUTH_REDIRECT'
-              ? 'Your session expired. Please log in again.'
-              : 'Sorry, something went wrong. Please try again.';
+          const isAuthRedirect = err instanceof Error && err.message === 'AUTH_REDIRECT';
+          const message = isAuthRedirect
+            ? 'Your session expired. Please log in again.'
+            : `Sorry, something went wrong. Please try again.${err instanceof Error ? ` (${err.message})` : ''}`;
           updateMessage(assistantMsg.id, {
             isStreaming: false,
             content: message,
@@ -129,7 +130,6 @@ export function useChat() {
     },
     [
       activeConversationId,
-      messages,
       isStreaming,
       addMessage,
       appendToMessage,
@@ -147,7 +147,9 @@ export function useChat() {
   const retry = useCallback(() => {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg) {
-      const filtered = messages.slice(0, -1);
+      // Remove both the failed assistant reply and the user message that triggered it
+      const lastUserIdx = messages.lastIndexOf(lastUserMsg);
+      const filtered = messages.slice(0, lastUserIdx);
       setMessages(filtered);
       sendMessage(lastUserMsg.content);
     }
