@@ -6,9 +6,26 @@ const PUBLIC_PATHS = ["/login", "/signup", "/auth/callback", "/api/daily-brief"]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isApiPath = pathname.startsWith("/api/");
 
-  // First, refresh the session (updates cookies)
-  const response = await updateSession(request);
+  let response: NextResponse;
+  try {
+    // First, refresh the session (updates cookies)
+    response = await updateSession(request);
+  } catch (error) {
+    console.error("[middleware] session refresh failed", error);
+    // Never block API routes at middleware layer; API handlers enforce auth.
+    if (isApiPath) {
+      return NextResponse.next({ request });
+    }
+    response = NextResponse.next({ request });
+  }
+
+  // API routes should not be redirected by middleware.
+  // Their handlers return JSON 401/500 responses as needed.
+  if (isApiPath) {
+    return response;
+  }
 
   // Build a lightweight Supabase client from the *response* cookies
   // so we read the freshly-refreshed tokens.
@@ -29,9 +46,15 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const {
+      data: { user: resolvedUser },
+    } = await supabase.auth.getUser();
+    user = resolvedUser;
+  } catch (error) {
+    console.error("[middleware] auth user check failed", error);
+  }
 
   const isPublicPath = PUBLIC_PATHS.some(
     (path) => pathname === path || pathname.startsWith(path + "/")
