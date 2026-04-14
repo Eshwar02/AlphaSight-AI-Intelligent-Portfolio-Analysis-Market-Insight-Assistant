@@ -20,19 +20,85 @@ function normalizeApiKey(rawValue: string | undefined): string {
   return trimmed;
 }
 
+export function validateGroqSetup(): { valid: boolean; error?: string } {
+  const rawKey = process.env.GROQ_API_KEY;
+  const apiKey = normalizeApiKey(rawKey);
+
+  if (!apiKey) {
+    return {
+      valid: false,
+      error: "GROQ_API_KEY environment variable is not set",
+    };
+  }
+
+  if (!apiKey.startsWith("gsk_")) {
+    return {
+      valid: false,
+      error: "GROQ_API_KEY does not appear to be valid (should start with 'gsk_')",
+    };
+  }
+
+  return { valid: true };
+}
+
 function getGroqClient(): Groq {
   if (groqClient) return groqClient;
 
-  const apiKey = normalizeApiKey(process.env.GROQ_API_KEY);
-  if (!apiKey) {
-    throw new Error("GROQ_API_KEY is not configured");
+  const validation = validateGroqSetup();
+  if (!validation.valid) {
+    throw new Error(validation.error || "Groq API not configured");
   }
 
+  const apiKey = normalizeApiKey(process.env.GROQ_API_KEY);
+  console.log("[Groq] Initializing with API key (first 10 chars):", apiKey.substring(0, 10));
   groqClient = new Groq({ apiKey });
   return groqClient;
 }
 
-const MODEL = "llama-3.3-70b-versatile";
+// Model priority: try the best available model first, fall back to smaller ones
+const MODEL_PRIORITY = [
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+] as const;
+
+// Cache the working model after first successful call
+let workingModel: string | null = null;
+
+async function getWorkingModel(client: Groq): Promise<string> {
+  if (workingModel) return workingModel;
+
+  for (const model of MODEL_PRIORITY) {
+    try {
+      await client.chat.completions.create({
+        model,
+        messages: [{ role: "user", content: "test" }],
+        max_tokens: 1,
+        stream: false,
+      });
+      workingModel = model;
+      console.log(`[Groq] Using model: ${model}`);
+      return model;
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status === 403 || status === 400) {
+        console.warn(`[Groq] Model ${model} unavailable (${status}), trying next...`);
+        continue;
+      }
+      // For other errors (rate limit, network), use this model anyway
+      workingModel = model;
+      return model;
+    }
+  }
+
+  // Final fallback
+  workingModel = "llama-3.1-8b-instant";
+  return workingModel;
+}
+
+// Synchronous getter that returns cached model or default
+function getModel(): string {
+  return workingModel || "llama-3.1-8b-instant";
+}
 
 /**
  * Build a context string from a StockAnalysis object for the LLM.
@@ -131,31 +197,46 @@ export async function streamStockAnalysis(
 
   messages.push({ role: "user", content: message });
 
-  const completion = await getGroqClient().chat.completions.create({
-    model: MODEL,
-    messages,
-    temperature: 0.7,
-    max_tokens: 2048,
-    stream: true,
-  });
+  const client = getGroqClient();
+  const model = await getWorkingModel(client);
+  console.log("[Groq] Starting stock analysis stream with", messages.length, "messages, model:", model);
 
-  const encoder = new TextEncoder();
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      messages,
+      temperature: 0.7,
+      max_tokens: 2048,
+      stream: true,
+    });
 
-  return new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of completion) {
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) {
-            controller.enqueue(encoder.encode(content));
+    console.log("[Groq] Stream created successfully");
+
+    const encoder = new TextEncoder();
+
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          let chunkCount = 0;
+          for await (const chunk of completion) {
+            chunkCount++;
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+              controller.enqueue(encoder.encode(content));
+            }
           }
+          console.log("[Groq] Stream completed with", chunkCount, "chunks");
+          controller.close();
+        } catch (error) {
+          console.error("[Groq] Stream error:", error);
+          controller.error(error);
         }
-        controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
-    },
-  });
+      },
+    });
+  } catch (error) {
+    console.error("[Groq] Failed to create stream:", error);
+    throw error;
+  }
 }
 
 /**
@@ -176,31 +257,46 @@ export async function streamGeneralChat(
 
   messages.push({ role: "user", content: message });
 
-  const completion = await getGroqClient().chat.completions.create({
-    model: MODEL,
-    messages,
-    temperature: 0.7,
-    max_tokens: 2048,
-    stream: true,
-  });
+  const client = getGroqClient();
+  const model = await getWorkingModel(client);
+  console.log("[Groq] Starting general chat stream with", messages.length, "messages, model:", model);
 
-  const encoder = new TextEncoder();
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      messages,
+      temperature: 0.7,
+      max_tokens: 2048,
+      stream: true,
+    });
 
-  return new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of completion) {
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) {
-            controller.enqueue(encoder.encode(content));
+    console.log("[Groq] General chat stream created");
+
+    const encoder = new TextEncoder();
+
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          let chunkCount = 0;
+          for await (const chunk of completion) {
+            chunkCount++;
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+              controller.enqueue(encoder.encode(content));
+            }
           }
+          console.log("[Groq] General chat stream completed with", chunkCount, "chunks");
+          controller.close();
+        } catch (error) {
+          console.error("[Groq] General chat stream error:", error);
+          controller.error(error);
         }
-        controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
-    },
-  });
+      },
+    });
+  } catch (error) {
+    console.error("[Groq] Failed to create general chat stream:", error);
+    throw error;
+  }
 }
 
 /**
@@ -287,8 +383,10 @@ export function streamAnalysis(data: StockAnalysis): ReadableStream<Uint8Array> 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const stream = await getGroqClient().chat.completions.create({
-          model: MODEL,
+        const client = getGroqClient();
+        const model = await getWorkingModel(client);
+        const stream = await client.chat.completions.create({
+          model,
           messages: [
             { role: "system", content: STOCK_ANALYSIS_SYSTEM_PROMPT },
             { role: "user", content: userPrompt },
@@ -328,8 +426,10 @@ export async function generateAnalysis(data: StockAnalysis): Promise<string> {
   const userPrompt = buildAnalysisPrompt(data);
 
   try {
-    const response = await getGroqClient().chat.completions.create({
-      model: MODEL,
+    const client = getGroqClient();
+    const model = await getWorkingModel(client);
+    const response = await client.chat.completions.create({
+      model,
       messages: [
         { role: "system", content: STOCK_ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
@@ -352,8 +452,10 @@ export async function generateAnalysis(data: StockAnalysis): Promise<string> {
  * Generate a daily brief summary (non-streaming, returns full text).
  */
 export async function generateDailyBrief(prompt: string): Promise<string> {
-  const completion = await getGroqClient().chat.completions.create({
-    model: MODEL,
+  const client = getGroqClient();
+  const model = await getWorkingModel(client);
+  const completion = await client.chat.completions.create({
+    model,
     messages: [
       {
         role: "system",

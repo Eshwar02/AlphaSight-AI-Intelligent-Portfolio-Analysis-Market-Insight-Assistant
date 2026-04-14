@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu, LogOut, User } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
@@ -21,33 +21,42 @@ export function Header() {
         setMenuOpen(false);
       }
     }
-    if (menuOpen) document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
   }, [menuOpen]);
 
+  /* Fetch user initial once */
   useEffect(() => {
+    let isMounted = true;
     const supabase = createClient();
 
-    void supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!isMounted) return;
       const user = data.user;
       const source = user?.user_metadata?.full_name || user?.email || 'A';
       const first = source.trim().charAt(0).toUpperCase();
       if (first) setInitial(first);
     });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  async function handleSignOut() {
+  const handleSignOut = useCallback(async () => {
     setMenuOpen(false);
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace('/login');
     router.refresh();
-  }
+  }, [router]);
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-dark-700/50 bg-dark-900 px-3">
       {/* ── Left: toggle sidebar ───────────────── */}
-      <div className="flex items-center">
+      <div className="flex items-center md:hidden">
         {!sidebarOpen && (
           <button
             onClick={toggleSidebar}
@@ -60,14 +69,14 @@ export function Header() {
       </div>
 
       {/* ── Center: model label ────────────────── */}
-      <div className="absolute left-1/2 -translate-x-1/2">
+      <div className="flex-1 text-center md:flex-none">
         <span className="text-sm font-medium text-gray-400">
           AlphaSight Pro
         </span>
       </div>
 
       {/* ── Right: user menu ───────────────────── */}
-      <div ref={menuRef} className="relative">
+      <div ref={menuRef} className="relative ml-auto">
         <button
           onClick={() => setMenuOpen((p) => !p)}
           className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-green text-sm font-semibold text-dark-950 transition-opacity hover:opacity-90"

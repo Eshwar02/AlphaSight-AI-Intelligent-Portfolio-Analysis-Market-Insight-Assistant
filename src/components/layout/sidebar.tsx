@@ -98,13 +98,15 @@ export function Sidebar() {
     if (pathname !== '/') {
       router.push('/');
     }
-    if (window.innerWidth < 768) toggleSidebar();
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (isMobile) toggleSidebar();
   }, [createNewChat, pathname, router, toggleSidebar]);
 
   const handleSelectChat = useCallback(
     (id: string) => {
       setActiveConversation(id);
-      if (window.innerWidth < 768) toggleSidebar();
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobile) toggleSidebar();
     },
     [setActiveConversation, toggleSidebar]
   );
@@ -233,32 +235,16 @@ export function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* Desktop sidebar */}
+      {/* Sidebar - unified for desktop and mobile */}
       <AnimatePresence initial={false}>
         {sidebarOpen && (
           <motion.aside
             key="sidebar"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 260, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={{ x: -260, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -260, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="relative hidden h-full shrink-0 overflow-hidden md:block"
-          >
-            <div className="absolute inset-0 w-[260px]">{sidebarContent}</div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
-
-      {/* Mobile sidebar */}
-      <AnimatePresence initial={false}>
-        {sidebarOpen && (
-          <motion.aside
-            key="mobile-sidebar"
-            initial={{ x: -260 }}
-            animate={{ x: 0 }}
-            exit={{ x: -260 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="fixed left-0 top-0 z-50 h-full w-[260px] md:hidden"
+            className="fixed left-0 top-0 z-40 h-full w-[260px] md:static md:z-auto"
           >
             {sidebarContent}
           </motion.aside>

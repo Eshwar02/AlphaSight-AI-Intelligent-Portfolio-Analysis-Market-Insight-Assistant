@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(curl -s http://localhost:3099/api/test-groq)",
+      "Bash(taskkill //f //im node.exe)"
     ]
   }
 }

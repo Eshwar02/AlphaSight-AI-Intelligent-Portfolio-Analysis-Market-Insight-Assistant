@@ -33,10 +33,27 @@ export function ChatPanel() {
 
   const hasMessages = messages.length > 0;
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when new messages appear
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (bottomRef.current && scrollRef.current) {
+      const scrollContainer = scrollRef.current;
+      requestAnimationFrame(() => {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      });
+    }
+  }, [messages.length]);
+
+  // Also auto-scroll during streaming as content appends
+  const lastMessage = messages[messages.length - 1];
+  const streamingContent = lastMessage?.isStreaming ? lastMessage.content.length : 0;
+  useEffect(() => {
+    if (streamingContent > 0 && scrollRef.current) {
+      const scrollContainer = scrollRef.current;
+      requestAnimationFrame(() => {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      });
+    }
+  }, [streamingContent]);
 
   return (
     <div className="flex h-full flex-col bg-dark-900">

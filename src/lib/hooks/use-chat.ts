@@ -26,7 +26,7 @@ export function useChat() {
 
       const userMsg: ChatMessage = {
         id: generateId(),
-        conversation_id: activeConversationId ?? '',
+        conversation_id: activeConversationId || '',
         role: 'user',
         content: content.trim(),
         metadata: null,
@@ -35,7 +35,7 @@ export function useChat() {
 
       const assistantMsg: ChatMessage = {
         id: generateId(),
-        conversation_id: activeConversationId ?? '',
+        conversation_id: activeConversationId || '',
         role: 'assistant',
         content: '',
         metadata: null,
@@ -72,7 +72,9 @@ export function useChat() {
         }
 
         if (!res.ok) {
-          throw new Error(`Chat request failed: ${res.status}`);
+          const errorData = await res.json().catch(() => ({}));
+          const errorMsg = errorData.details || errorData.error || `HTTP ${res.status}`;
+          throw new Error(`Chat request failed: ${res.status} - ${errorMsg}`);
         }
 
         const newConvId = res.headers.get('x-conversation-id');
@@ -85,6 +87,9 @@ export function useChat() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
+          // Update user and assistant message IDs with new conversation ID
+          updateMessage(userMsg.id, { conversation_id: newConvId });
+          updateMessage(assistantMsg.id, { conversation_id: newConvId });
         }
 
         const reader = res.body?.getReader();

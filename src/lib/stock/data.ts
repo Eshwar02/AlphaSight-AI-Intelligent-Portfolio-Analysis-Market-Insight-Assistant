@@ -132,39 +132,20 @@ function mapHistoryFromChart(chart: YahooChartResult): StockHistory {
  * Returns null if the symbol is invalid or the request fails.
  */
 export async function fetchQuote(symbol: string): Promise<StockQuote | null> {
+  // Use chart API directly — the yahoo-finance2 SDK's quote() is broken
+  // (crumb/cookie auth issues, 429 rate limits). The v8 chart endpoint
+  // works reliably and includes quote data in its `meta` field.
   try {
-    const result = await yahoo.quote(symbol);
-
-    if (result && result.regularMarketPrice !== null && result.regularMarketPrice !== undefined) {
-      return {
-        symbol: result.symbol,
-        name: result.shortName || result.longName || result.symbol,
-        price: result.regularMarketPrice,
-        change: result.regularMarketChange ?? 0,
-        changePercent: result.regularMarketChangePercent ?? 0,
-        volume: result.regularMarketVolume ?? 0,
-        marketCap: result.marketCap ?? 0,
-        pe: result.trailingPE ?? null,
-        high52: result.fiftyTwoWeekHigh ?? 0,
-        low52: result.fiftyTwoWeekLow ?? 0,
-        dayHigh: result.regularMarketDayHigh ?? 0,
-        dayLow: result.regularMarketDayLow ?? 0,
-        open: result.regularMarketOpen ?? 0,
-        previousClose: result.regularMarketPreviousClose ?? 0,
-        currency: result.currency || "USD",
-        exchange: result.fullExchangeName || result.exchange || "",
-      };
-    }
+    const chart = await fetchChartResult(symbol, { range: "5d", interval: "1d" });
+    if (!chart) return null;
+    return mapQuoteFromChart(symbol, chart);
   } catch (error) {
     console.error(
       `[fetchQuote] Failed for ${symbol}:`,
       error instanceof Error ? error.message : error
     );
+    return null;
   }
-
-  const chart = await fetchChartResult(symbol, { range: "5d", interval: "1d" });
-  if (!chart) return null;
-  return mapQuoteFromChart(symbol, chart);
 }
 
 /**
@@ -185,35 +166,6 @@ export async function fetchHistory(
   defaultStart.setFullYear(defaultStart.getFullYear() - years);
   const from = period1 || defaultStart;
   const to = period2 || new Date();
-
-  try {
-    const result = await yahoo.chart(symbol, {
-      period1: from,
-      period2: to,
-      interval: "1d",
-    });
-
-    if (result.quotes && result.quotes.length > 0) {
-      return result.quotes
-        .filter((q) => q.close !== null && q.close !== undefined)
-        .map((q) => ({
-          date:
-            q.date instanceof Date
-              ? q.date.toISOString().split("T")[0]
-              : String(q.date).split("T")[0],
-          open: q.open ?? 0,
-          high: q.high ?? 0,
-          low: q.low ?? 0,
-          close: q.close ?? 0,
-          volume: q.volume ?? 0,
-        }));
-    }
-  } catch (error) {
-    console.error(
-      `[fetchHistory] Failed for ${symbol}:`,
-      error instanceof Error ? error.message : error
-    );
-  }
 
   const chart = await fetchChartResult(symbol, {
     period1: Math.floor(from.getTime() / 1000).toString(),

@@ -45,7 +45,7 @@ AlphaSight AI is a professional, AI-first stock intelligence platform for invest
 | **Backend APIs** | Next.js Route Handlers |
 | **Database & Auth** | Supabase (PostgreSQL + RLS + OAuth) |
 | **AI Layer** | Groq SDK (`llama-3.3-70b-versatile`) |
-| **Market Data** | `yahoo-finance2` |
+| **Market Data** | Yahoo Finance chart/search HTTP endpoints (SDK-independent) |
 | **News Sources** | MarketAux, NewsData.io |
 | **Deployment** | Vercel |
 
@@ -213,4 +213,9 @@ supabase/
 ## ✅ Status
 
 Production build passes successfully.
+
+## 📈 Market Data Reliability Notes
+
+- Quote and history requests use Yahoo's v8 chart endpoint directly to avoid crumb/cookie failures and `429` issues seen in SDK quote/history flows.
+- Symbol discovery and news lookup use Yahoo's v1 search endpoint.
 

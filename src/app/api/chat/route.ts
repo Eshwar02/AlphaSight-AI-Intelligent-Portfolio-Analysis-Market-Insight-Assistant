@@ -5,7 +5,7 @@ import { fetchQuote, fetchHistory, fetchCompanyInfo } from "@/lib/stock/data";
 import { analyzeTechnicals } from "@/lib/stock/technicals";
 import { fetchStockNews } from "@/lib/stock/news";
 import { assessMacroRisks, assessRawMaterialRisks } from "@/lib/stock/macro";
-import { streamStockAnalysis, streamGeneralChat } from "@/lib/ai/groq";
+import { streamStockAnalysis, streamGeneralChat, validateGroqSetup } from "@/lib/ai/groq";
 import type { StockAnalysis } from "@/types/stock";
 
 // Regex patterns for detecting stock queries
@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error("[chat] Auth error:", authError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -156,6 +157,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Message too long (max 4000 characters)" },
         { status: 400 }
+      );
+    }
+
+    console.log(`[chat] New message from user ${user.id}: "${message.slice(0, 50)}..."`);
+
+    // Validate Groq setup early
+    const groqValidation = validateGroqSetup();
+    if (!groqValidation.valid) {
+      console.error("[chat] Groq validation failed:", groqValidation.error);
+      return NextResponse.json(
+        { error: "LLM service not configured", details: groqValidation.error },
+        { status: 503 }
       );
     }
 
@@ -232,11 +245,12 @@ export async function POST(request: NextRequest) {
     const stockQuery = detectStockQuery(message);
     console.log(`[chat] user=${user.id} stockQuery=${stockQuery} msg="${message.slice(0, 80)}"`);
     let stockAnalysis: StockAnalysis | null = null;
-    let stream: ReadableStream<Uint8Array>;
+    let stream: ReadableStream<Uint8Array> | null = null;
 
-    if (stockQuery) {
-      // Resolve the symbol
-      const symbol = await resolveSymbol(stockQuery);
+    try {
+      if (stockQuery) {
+        // Resolve the symbol
+        const symbol = await resolveSymbol(stockQuery);
 
         if (symbol) {
           try {
@@ -290,8 +304,9 @@ export async function POST(request: NextRequest) {
               20000,
               "stockAnalysisStream"
             );
-          } catch {
+          } catch (err) {
             // If stock data fetch fails, fall back to general chat
+            console.error("[chat] Stock data fetch error:", err);
             stream = await withTimeout(
               streamGeneralChat(message, conversationHistory),
               20000,
@@ -314,8 +329,29 @@ export async function POST(request: NextRequest) {
           "generalChatStream"
         );
       }
+    } catch (err) {
+      // Fallback if anything goes wrong
+      console.error("[chat] Unexpected error during streaming setup:", err);
+      try {
+        stream = await withTimeout(
+          streamGeneralChat(message, conversationHistory),
+          20000,
+          "generalChatStreamFallback"
+        );
+      } catch (fallbackErr) {
+        console.error("[chat] Fallback stream also failed:", fallbackErr);
+        throw fallbackErr;
+      }
+    }
 
-    const guardedStream = withStreamTimeout(stream, 25000, "chatStream");
+    if (!stream) {
+      return NextResponse.json(
+        { error: "Failed to initialize chat stream" },
+        { status: 500 }
+      );
+    }
+
+    const guardedStream = withStreamTimeout(stream!, 25000, "chatStream");
 
     // Create a tee to capture the full response for saving to DB
     const [streamForClient, streamForCapture] = guardedStream.tee();
@@ -409,8 +445,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Chat API error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error details:", errorMessage);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: errorMessage },
       { status: 500 }
     );
   }
