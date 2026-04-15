@@ -299,6 +299,12 @@ function isLikelyIndianQuery(query: string): boolean {
   return INDIAN_INDICATORS.some((ind) => lower.includes(ind));
 }
 
+function isCryptoQuery(query: string): boolean {
+  return /\b(crypto|bitcoin|btc|ethereum|eth|solana|sol|doge|xrp)\b/i.test(
+    query
+  );
+}
+
 /**
  * Resolve a user query into a valid Yahoo Finance ticker symbol.
  *
@@ -389,9 +395,31 @@ export async function resolveSymbol(query: string): Promise<string | null> {
       quotesCount: 5,
     });
     if (results.quotes && results.quotes.length > 0) {
-      const first = results.quotes[0];
-      if ("symbol" in first && first.symbol) {
-        return first.symbol as string;
+      const isCrypto = isCryptoQuery(query);
+      const quotes = results.quotes.filter(
+        (q): q is Record<string, unknown> =>
+          !!q && typeof q === "object" && "symbol" in q && !!q.symbol
+      );
+
+      const preferred =
+        quotes.find((q) => {
+          const quoteType = String(q.quoteType || "").toUpperCase();
+          const symbol = String(q.symbol || "").toUpperCase();
+          if (isCrypto) {
+            return quoteType === "CRYPTOCURRENCY" || symbol.includes("-USD");
+          }
+          return quoteType === "EQUITY" || quoteType === "ETF";
+        }) ||
+        quotes.find((q) => {
+          if (isCrypto) return false;
+          const quoteType = String(q.quoteType || "").toUpperCase();
+          const symbol = String(q.symbol || "").toUpperCase();
+          return quoteType !== "CRYPTOCURRENCY" && !symbol.includes("-USD");
+        }) ||
+        quotes[0];
+
+      if (preferred?.symbol) {
+        return String(preferred.symbol);
       }
     }
   } catch {

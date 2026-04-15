@@ -77,6 +77,18 @@ export function useChat() {
           throw new Error(`Chat request failed: ${res.status} - ${errorMsg}`);
         }
 
+        const stockQuoteHeader = res.headers.get('x-stock-quote');
+        if (stockQuoteHeader) {
+          try {
+            const parsed = JSON.parse(
+              decodeURIComponent(stockQuoteHeader),
+            ) as NonNullable<ChatMessage['stockData']>[number];
+            updateMessage(assistantMsg.id, { stockData: [parsed] });
+          } catch {
+            // Ignore malformed stock quote header; text streaming still works.
+          }
+        }
+
         const newConvId = res.headers.get('x-conversation-id');
         if (newConvId && !activeConversationId) {
           setActiveConversation(newConvId);

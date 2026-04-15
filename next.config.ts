@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+  turbopack: {
+    resolveAlias: {
+      '@std/testing/mock': './src/lib/shims/empty-module.ts',
+      '@std/testing/bdd': './src/lib/shims/empty-module.ts',
+      '@gadicc/fetch-mock-cache/runtimes/deno.ts': './src/lib/shims/empty-module.ts',
+      '@gadicc/fetch-mock-cache/stores/fs.ts': './src/lib/shims/empty-module.ts',
+    },
+  },
   images: {
     remotePatterns: [
       {
@@ -19,10 +27,10 @@ const nextConfig: NextConfig = {
     if (isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,
-        '@std/testing/mock': false,
-        '@std/testing/bdd': false,
-        '@gadicc/fetch-mock-cache/runtimes/deno.ts': false,
-        '@gadicc/fetch-mock-cache/stores/fs.ts': false,
+        '@std/testing/mock': './src/lib/shims/empty-module.ts',
+        '@std/testing/bdd': './src/lib/shims/empty-module.ts',
+        '@gadicc/fetch-mock-cache/runtimes/deno.ts': './src/lib/shims/empty-module.ts',
+        '@gadicc/fetch-mock-cache/stores/fs.ts': './src/lib/shims/empty-module.ts',
       };
     }
     return config;

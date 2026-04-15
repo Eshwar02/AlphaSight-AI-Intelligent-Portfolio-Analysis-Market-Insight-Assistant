@@ -10,30 +10,6 @@ interface StockCardProps {
   stock: StockQuote;
 }
 
-function MiniSparkline({ positive }: { positive: boolean }) {
-  // SVG sparkline placeholder that shows a trending line
-  const points = positive
-    ? '0,20 8,18 16,15 24,16 32,12 40,10 48,8 56,11 64,6 72,4 80,3'
-    : '0,4 8,6 16,8 24,7 32,12 40,14 48,16 56,13 64,18 72,19 80,20';
-
-  return (
-    <svg
-      viewBox="0 0 80 24"
-      className="h-8 w-20"
-      preserveAspectRatio="none"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke={positive ? '#10b981' : '#ef4444'}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function StockCard({ stock }: StockCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isPositive = stock.change >= 0;
@@ -76,9 +52,6 @@ export function StockCard({ stock }: StockCardProps) {
           </div>
           <div className="mt-0.5 text-xs text-dark-500">{stock.exchange}</div>
         </div>
-
-        {/* Sparkline */}
-        <MiniSparkline positive={isPositive} />
 
         {/* Price + change */}
         <div className="shrink-0 text-right">
@@ -123,7 +96,10 @@ export function StockCard({ stock }: StockCardProps) {
               <Detail label="52W High" value={formatCurrency(stock.high52, stock.currency)} />
               <Detail label="52W Low" value={formatCurrency(stock.low52, stock.currency)} />
               <Detail label="Volume" value={formatNumber(stock.volume)} />
-              <Detail label="Market Cap" value={formatNumber(stock.marketCap)} />
+              <Detail
+                label="Market Cap"
+                value={stock.marketCap > 0 ? formatNumber(stock.marketCap) : "N/A"}
+              />
               {stock.pe !== null && (
                 <Detail label="P/E Ratio" value={stock.pe.toFixed(2)} />
               )}

@@ -6,6 +6,7 @@ import { User, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from './markdown-renderer';
 import { StockCard } from './stock-card';
+import { ChartWidget } from './chart-widget';
 import type { ChatMessage as ChatMessageType } from '@/stores/app-store';
 
 interface ChatMessageProps {
@@ -44,6 +45,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
     if (!message.stockData) return null;
     return message.stockData;
   }, [message.stockData]);
+  const primarySymbol = stockData?.[0]?.symbol;
 
   return (
     <motion.div
@@ -79,6 +81,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     <StockCard key={stock.symbol} stock={stock} />
                   ))}
                 </div>
+              )}
+
+              {primarySymbol && (
+                <ChartWidget symbol={primarySymbol} exchange={stockData?.[0]?.exchange} height={320} />
               )}
 
               {hasContent ? (

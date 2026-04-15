@@ -1,5 +1,5 @@
 import Groq from "groq-sdk";
-import { STOCK_ANALYSIS_SYSTEM_PROMPT, DAILY_BRIEF_PROMPT } from "./prompts";
+import { STOCK_ANALYSIS_SYSTEM_PROMPT, GENERAL_CHAT_PROMPT, DAILY_BRIEF_PROMPT } from "./prompts";
 import type { StockAnalysis } from "@/types/stock";
 
 let groqClient: Groq | null = null;
@@ -50,7 +50,7 @@ function getGroqClient(): Groq {
   }
 
   const apiKey = normalizeApiKey(process.env.GROQ_API_KEY);
-  console.log("[Groq] Initializing with API key (first 10 chars):", apiKey.substring(0, 10));
+  console.log("[Groq] Initializing client");
   groqClient = new Groq({ apiKey });
   return groqClient;
 }
@@ -101,30 +101,195 @@ function getModel(): string {
 }
 
 /**
- * Build a context string from a StockAnalysis object for the LLM.
+ * Classify user intent using LLM. Used as a fallback when regex detection fails.
+ * Uses the fast 8b model with minimal tokens for speed.
+ */
+export async function classifyIntent(
+  message: string
+): Promise<{
+  intent: string;
+  company_name: string | null;
+  symbols: string[];
+  query_type: string;
+} | null> {
+  try {
+    const client = getGroqClient();
+    const response = await client.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        {
+          role: "system",
+          content: `You are a financial query classifier. Determine if the user is asking about a specific stock or company. Respond ONLY with valid JSON, nothing else.`,
+        },
+        {
+          role: "user",
+          content: `Classify: "${message}"
+
+JSON format:
+{"intent":"stock_query"|"general_finance"|"greeting"|"comparison"|"market_overview"|"other","company_name":"name or null","symbols":["TICKER"],"query_type":"analysis"|"price"|"news"|"comparison"|"general"}
+
+Rules:
+- If user mentions ANY company or stock by name, intent=stock_query and include company_name
+- "reliance" = Reliance Industries, "tcs" = TCS, "apple" = Apple Inc, etc.
+- If it's a greeting or off-topic, intent=other
+- For general finance questions (what is PE ratio), intent=general_finance`,
+        },
+      ],
+      temperature: 0,
+      max_tokens: 120,
+      stream: false,
+    });
+
+    const content = response.choices[0]?.message?.content?.trim();
+    if (!content) return null;
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.error("[classifyIntent] Failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Build a comprehensive context string from a StockAnalysis object for the LLM.
+ * Includes price data, company profile, historical performance, technicals, news, and risks.
  */
 function buildStockContext(analysis: StockAnalysis): string {
-  const { quote, technicals, news, macroRisks, rawMaterialRisks } = analysis;
+  const { quote, history, technicals, news, macroRisks, rawMaterialRisks, companyInfo } = analysis;
 
-  let context = `## Stock Data for ${quote.name} (${quote.symbol})\n\n`;
+  let context = `## Real-Time Data for ${quote.name} (${quote.symbol})\n\n`;
 
+  // ── Price & Market Data ──
   context += `### Price & Market Data\n`;
   context += `- Current Price: ${quote.currency} ${quote.price.toFixed(2)}\n`;
   context += `- Change: ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%)\n`;
+  context += `- Open: ${quote.currency} ${quote.open.toFixed(2)}\n`;
+  context += `- Previous Close: ${quote.currency} ${quote.previousClose.toFixed(2)}\n`;
   context += `- Day Range: ${quote.dayLow.toFixed(2)} - ${quote.dayHigh.toFixed(2)}\n`;
   context += `- 52-Week Range: ${quote.low52.toFixed(2)} - ${quote.high52.toFixed(2)}\n`;
-  context += `- Market Cap: ${formatLargeNumber(quote.marketCap)}\n`;
+  const pctFrom52High = quote.high52 > 0 ? (((quote.price - quote.high52) / quote.high52) * 100).toFixed(1) : "N/A";
+  const pctFrom52Low = quote.low52 > 0 ? (((quote.price - quote.low52) / quote.low52) * 100).toFixed(1) : "N/A";
+  context += `- Position in 52-Week Range: ${pctFrom52High}% from high, +${pctFrom52Low}% from low\n`;
+  context += `- Market Cap: ${quote.marketCap > 0 ? formatLargeNumber(quote.marketCap) : "N/A"}\n`;
   context += `- Volume: ${formatLargeNumber(quote.volume)}\n`;
-  context += `- P/E Ratio: ${quote.pe !== null ? quote.pe.toFixed(2) : "N/A"}\n\n`;
+  context += `- P/E Ratio: ${quote.pe !== null ? quote.pe.toFixed(2) : "N/A"}\n`;
+  context += `- Exchange: ${quote.exchange}\n\n`;
 
+  // ── Company Profile ──
+  if (companyInfo) {
+    context += `### Company Profile\n`;
+    context += `- Sector: ${companyInfo.sector}\n`;
+    context += `- Industry: ${companyInfo.industry}\n`;
+    context += `- Country: ${companyInfo.country || "N/A"}\n`;
+    if (companyInfo.website) context += `- Website: ${companyInfo.website}\n`;
+    if (companyInfo.employees) context += `- Employees: ${formatLargeNumber(companyInfo.employees)}\n`;
+    if (companyInfo.description) {
+      const desc = companyInfo.description.length > 800
+        ? companyInfo.description.substring(0, 797) + "..."
+        : companyInfo.description;
+      context += `- Business Description: ${desc}\n`;
+    }
+    context += "\n";
+  }
+
+  // ── Historical Performance ──
+  if (history.length > 0) {
+    context += `### Historical Performance\n`;
+    const histLen = history.length;
+    const oldestDate = history[0].date;
+    const newestDate = history[histLen - 1].date;
+    const oldestClose = history[0].close;
+    const newestClose = history[histLen - 1].close;
+    context += `- Data Range: ${oldestDate} to ${newestDate} (${histLen} trading days)\n`;
+
+    // Multi-period returns
+    const periods = [
+      { label: "1 Month", days: 22 },
+      { label: "3 Months", days: 66 },
+      { label: "6 Months", days: 132 },
+      { label: "1 Year", days: 252 },
+      { label: "3 Years", days: 756 },
+      { label: "5 Years", days: 1260 },
+    ];
+    for (const p of periods) {
+      if (histLen >= p.days) {
+        const pastClose = history[histLen - p.days].close;
+        if (pastClose > 0) {
+          const ret = ((newestClose - pastClose) / pastClose * 100).toFixed(1);
+          context += `- ${p.label} Return: ${Number(ret) >= 0 ? "+" : ""}${ret}%\n`;
+        }
+      }
+    }
+
+    // CAGR
+    if (oldestClose > 0 && histLen > 252) {
+      const years = histLen / 252;
+      const cagr = (Math.pow(newestClose / oldestClose, 1 / years) - 1) * 100;
+      context += `- Approximate CAGR (${years.toFixed(1)}yr): ${cagr.toFixed(2)}%\n`;
+    }
+
+    // Dataset high/low
+    let datasetHigh = 0, athDate = "";
+    let datasetLow = Infinity, atlDate = "";
+    for (const h of history) {
+      if (h.high > datasetHigh) { datasetHigh = h.high; athDate = h.date; }
+      if (h.low < datasetLow && h.low > 0) { datasetLow = h.low; atlDate = h.date; }
+    }
+    context += `- All-Time High (in data): ${quote.currency} ${datasetHigh.toFixed(2)} on ${athDate}\n`;
+    if (datasetLow < Infinity) {
+      context += `- All-Time Low (in data): ${quote.currency} ${datasetLow.toFixed(2)} on ${atlDate}\n`;
+    }
+
+    // 30-day volume analysis
+    const recent30 = history.slice(-30);
+    const avgVol30 = recent30.length > 0
+      ? Math.round(recent30.reduce((s, d) => s + d.volume, 0) / recent30.length)
+      : 0;
+    if (avgVol30 > 0) {
+      context += `- Average Volume (30d): ${formatLargeNumber(avgVol30)}\n`;
+      if (quote.volume > 0) {
+        const volRatio = (quote.volume / avgVol30 * 100).toFixed(0);
+        context += `- Today's Volume vs 30d Avg: ${volRatio}%\n`;
+      }
+    }
+    context += "\n";
+  }
+
+  // ── Technical Indicators ──
   context += `### Technical Indicators\n`;
-  context += `- 20-day SMA: ${technicals.sma20 !== null ? technicals.sma20.toFixed(2) : "N/A"}\n`;
-  context += `- 50-day SMA: ${technicals.sma50 !== null ? technicals.sma50.toFixed(2) : "N/A"}\n`;
+  context += `- 20-day SMA: ${technicals.sma20 !== null ? technicals.sma20.toFixed(2) : "N/A"}`;
+  if (technicals.sma20 !== null) {
+    const pctVsSma20 = ((quote.price - technicals.sma20) / technicals.sma20 * 100).toFixed(1);
+    context += ` (price is ${Number(pctVsSma20) >= 0 ? "+" : ""}${pctVsSma20}% vs SMA20)`;
+  }
+  context += "\n";
+  context += `- 50-day SMA: ${technicals.sma50 !== null ? technicals.sma50.toFixed(2) : "N/A"}`;
+  if (technicals.sma50 !== null) {
+    const pctVsSma50 = ((quote.price - technicals.sma50) / technicals.sma50 * 100).toFixed(1);
+    context += ` (price is ${Number(pctVsSma50) >= 0 ? "+" : ""}${pctVsSma50}% vs SMA50)`;
+  }
+  context += "\n";
+  if (technicals.sma20 !== null && technicals.sma50 !== null) {
+    const crossover = technicals.sma20 > technicals.sma50 ? "Golden Cross (bullish)" : "Death Cross (bearish)";
+    context += `- SMA Crossover Status: ${crossover}\n`;
+  }
   context += `- 20-day EMA: ${technicals.ema20 !== null ? technicals.ema20.toFixed(2) : "N/A"}\n`;
-  context += `- RSI (14): ${technicals.rsi !== null ? technicals.rsi.toFixed(2) : "N/A"}\n`;
+  context += `- RSI (14): ${technicals.rsi !== null ? technicals.rsi.toFixed(2) : "N/A"}`;
+  if (technicals.rsi !== null) {
+    const rsiLabel = technicals.rsi > 70 ? " (OVERBOUGHT)" : technicals.rsi < 30 ? " (OVERSOLD)" : " (Neutral zone)";
+    context += rsiLabel;
+  }
+  context += "\n";
   context += `- MACD Line: ${technicals.macd.macdLine !== null ? technicals.macd.macdLine.toFixed(2) : "N/A"}\n`;
   context += `- MACD Signal: ${technicals.macd.signalLine !== null ? technicals.macd.signalLine.toFixed(2) : "N/A"}\n`;
-  context += `- MACD Histogram: ${technicals.macd.histogram !== null ? technicals.macd.histogram.toFixed(2) : "N/A"}\n`;
+  context += `- MACD Histogram: ${technicals.macd.histogram !== null ? technicals.macd.histogram.toFixed(2) : "N/A"}`;
+  if (technicals.macd.histogram !== null) {
+    context += technicals.macd.histogram > 0 ? " (Bullish momentum)" : " (Bearish momentum)";
+  }
+  context += "\n";
   context += `- Trend Direction: ${technicals.trend.toUpperCase()}\n`;
   context += `- Support Levels: ${technicals.supportLevels.map((s) => s.toFixed(2)).join(", ") || "N/A"}\n`;
   context += `- Resistance Levels: ${technicals.resistanceLevels.map((r) => r.toFixed(2)).join(", ") || "N/A"}\n`;
@@ -136,22 +301,29 @@ function buildStockContext(analysis: StockAnalysis): string {
   }
   context += "\n";
 
+  // ── News ──
   if (news.length > 0) {
-    context += `### Recent News\n`;
-    for (const item of news.slice(0, 4)) {
-      context += `- ${item.title} (${item.source})\n`;
+    context += `### Recent News (${news.length} items)\n`;
+    for (const item of news.slice(0, 8)) {
+      if (item.url) {
+        context += `- [${item.title}](${item.url}) — ${item.source} (${item.publishedAt.split("T")[0]})\n`;
+      } else {
+        context += `- ${item.title} — ${item.source} (${item.publishedAt.split("T")[0]})\n`;
+      }
     }
     context += "\n";
   }
 
+  // ── Macro Risks ──
   if (macroRisks.length > 0) {
-    context += `### Macro Risks\n`;
+    context += `### Macro & Geopolitical Risks\n`;
     for (const risk of macroRisks) {
       context += `- ${risk}\n`;
     }
     context += "\n";
   }
 
+  // ── Supply Chain Risks ──
   if (rawMaterialRisks.length > 0) {
     context += `### Supply Chain / Raw Material Risks\n`;
     for (const risk of rawMaterialRisks) {
@@ -205,8 +377,8 @@ export async function streamStockAnalysis(
     const completion = await client.chat.completions.create({
       model,
       messages,
-      temperature: 0.7,
-      max_tokens: 2048,
+      temperature: 0.35,
+      max_tokens: 8192,
       stream: true,
     });
 
@@ -247,7 +419,7 @@ export async function streamGeneralChat(
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>
 ): Promise<ReadableStream<Uint8Array>> {
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-    { role: "system", content: STOCK_ANALYSIS_SYSTEM_PROMPT },
+    { role: "system", content: GENERAL_CHAT_PROMPT },
   ];
 
   const recentHistory = conversationHistory.slice(-10);
@@ -265,8 +437,8 @@ export async function streamGeneralChat(
     const completion = await client.chat.completions.create({
       model,
       messages,
-      temperature: 0.7,
-      max_tokens: 2048,
+      temperature: 0.35,
+      max_tokens: 3072,
       stream: true,
     });
 
@@ -336,7 +508,12 @@ function buildAnalysisPrompt(data: StockAnalysis): string {
     : 0;
 
   const newsSection = news
-    .map((n, i) => `${i + 1}. [${n.source}] ${n.title} (${n.publishedAt.split("T")[0]})`)
+    .map((n, i) => {
+      if (n.url) {
+        return `${i + 1}. [${n.title}](${n.url}) — ${n.source} (${n.publishedAt.split("T")[0]})`;
+      }
+      return `${i + 1}. ${n.title} — ${n.source} (${n.publishedAt.split("T")[0]})`;
+    })
     .join("\n");
   const macroSection = macroRisks.map((r, i) => `${i + 1}. ${r}`).join("\n");
   const rawMatSection = rawMaterialRisks.map((r, i) => `${i + 1}. ${r}`).join("\n");

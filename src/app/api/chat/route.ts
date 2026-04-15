@@ -5,15 +5,30 @@ import { fetchQuote, fetchHistory, fetchCompanyInfo } from "@/lib/stock/data";
 import { analyzeTechnicals } from "@/lib/stock/technicals";
 import { fetchStockNews } from "@/lib/stock/news";
 import { assessMacroRisks, assessRawMaterialRisks } from "@/lib/stock/macro";
-import { streamStockAnalysis, streamGeneralChat, validateGroqSetup } from "@/lib/ai/groq";
+import { streamStockAnalysis, streamGeneralChat, validateGroqSetup, classifyIntent } from "@/lib/ai/groq";
 import type { StockAnalysis } from "@/types/stock";
 
 // Regex patterns for detecting stock queries
-const TICKER_PATTERN = /\b[A-Z]{1,5}(?:\.[A-Z]{1,2})?\b/;
+const TICKER_PATTERN = /\$?([A-Z]{2,10}(?:\.[A-Z]{1,2})?)\b/g;
 const STOCK_KEYWORDS =
   /\b(stock|share|price|quote|analysis|analyze|ticker|market cap|pe ratio|buy|sell|hold|bullish|bearish|technical|fundamentals?|earnings|dividend|chart|52.week|support|resistance|rsi|sma|moving average)\b/i;
 const COMPANY_NAMES =
   /\b(apple|microsoft|google|alphabet|amazon|tesla|meta|facebook|nvidia|netflix|amd|intel|disney|walmart|jpmorgan|coca.cola|pepsi|boeing|nike|visa|mastercard|paypal|salesforce|adobe|spotify|uber|airbnb|snowflake|palantir|coinbase|shopify|zoom|oracle|ibm|qualcomm|broadcom|berkshire|reliance|tcs|infosys|wipro|hdfc|tata)\b/i;
+const MARKET_OVERVIEW_KEYWORDS =
+  /\b(markets?|economy|inflation|fed|interest rates?|dow|nasdaq|s&p|sensex|nifty|indices?|global|macro)\b/i;
+const COMMON_NON_TICKER_WORDS = new Set([
+  "US", "USA", "THE", "AND", "FOR", "ARE", "NOT", "YOU", "ALL",
+  "CAN", "HAD", "HER", "WAS", "ONE", "OUR", "OUT", "DAY", "GET",
+  "HAS", "HIM", "HIS", "HOW", "ITS", "MAY", "NEW", "NOW", "OLD",
+  "SEE", "WAY", "WHO", "DID", "LET", "SAY", "SHE", "TOO", "USE",
+  "WHAT", "WHEN", "WILL", "WITH", "THIS", "THAT", "FROM", "HAVE",
+  "BEEN", "SOME", "THAN", "THEM", "THEN", "VERY", "JUST", "ABOUT",
+  "INTO", "OVER", "ALSO", "BACK", "WELL", "ONLY", "EVEN", "MOST",
+  // Financial acronyms that look like tickers but aren't
+  "PE", "EPS", "RSI", "SMA", "EMA", "ETF", "IPO", "GDP", "CPI",
+  "PMI", "CEO", "CFO", "ROE", "ROI", "NAV", "EMI", "FII", "DII",
+  "RBI", "SEC", "FED", "YOY", "QOQ", "ATH", "ATL", "OTC",
+]);
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -89,39 +104,51 @@ function withStreamTimeout(
  * Returns the extracted query for symbol resolution, or null.
  */
 function detectStockQuery(message: string): string | null {
-  // Check for explicit ticker symbols (e.g., "AAPL", "TSLA")
-  const tickerMatch = message.match(TICKER_PATTERN);
+  const trimmed = message.trim();
+  if (!trimmed) return null;
 
   // Check for company name mentions
   const companyMatch = message.match(COMPANY_NAMES);
-
-  // Check for stock-related keywords
   const hasStockKeyword = STOCK_KEYWORDS.test(message);
+  const isLikelyMarketOverview = MARKET_OVERVIEW_KEYWORDS.test(message);
 
   if (companyMatch) {
     return companyMatch[0];
   }
 
-  if (tickerMatch && hasStockKeyword) {
-    return tickerMatch[0];
+  const tickerCandidates = Array.from(message.matchAll(TICKER_PATTERN))
+    .map((m) => (m[1] || "").toUpperCase())
+    .filter((word) => word && !COMMON_NON_TICKER_WORDS.has(word));
+
+  const explicitDollarTicker = message.match(/\$([A-Z]{1,10}(?:\.[A-Z]{1,2})?)/);
+  if (explicitDollarTicker?.[1]) {
+    return explicitDollarTicker[1].toUpperCase();
   }
 
-  // Also match patterns like "tell me about AAPL" or "how is MSFT doing"
-  if (tickerMatch) {
-    const word = tickerMatch[0];
-    // Filter out common English words that look like tickers
-    const commonWords = new Set([
-      "I", "A", "THE", "AND", "FOR", "ARE", "NOT", "YOU", "ALL",
-      "CAN", "HAD", "HER", "WAS", "ONE", "OUR", "OUT", "DAY", "GET",
-      "HAS", "HIM", "HIS", "HOW", "ITS", "MAY", "NEW", "NOW", "OLD",
-      "SEE", "WAY", "WHO", "DID", "LET", "SAY", "SHE", "TOO", "USE",
-      "WHAT", "WHEN", "WILL", "WITH", "THIS", "THAT", "FROM", "HAVE",
-      "BEEN", "SOME", "THAN", "THEM", "THEN", "VERY", "JUST", "ABOUT",
-      "INTO", "OVER", "ALSO", "BACK", "WELL", "ONLY", "EVEN", "MOST",
-    ]);
-    if (!commonWords.has(word)) {
-      return word;
+  if (tickerCandidates.length > 0) {
+    const standaloneTicker =
+      tickerCandidates.length === 1 &&
+      trimmed.replace("$", "").toUpperCase() === tickerCandidates[0];
+    if (hasStockKeyword || standaloneTicker) {
+      return tickerCandidates[0];
     }
+  }
+
+  if (!hasStockKeyword || isLikelyMarketOverview) {
+    return null;
+  }
+
+  const extractionPatterns = [
+    /(?:stock|price|quote|analysis|analyze)\s+(?:of|for|on)\s+([a-zA-Z0-9.&\-\s]{2,40})/i,
+    /(?:about)\s+([a-zA-Z0-9.&\-\s]{2,40})\s+(?:stock|share)/i,
+    /([a-zA-Z0-9.&\-\s]{2,40})\s+(?:stock|share)\s+(?:price|analysis|quote)/i,
+  ];
+
+  for (const pattern of extractionPatterns) {
+    const match = trimmed.match(pattern);
+    if (!match?.[1]) continue;
+    const candidate = match[1].replace(/\s+/g, " ").trim();
+    if (candidate.length >= 2) return candidate;
   }
 
   return null;
@@ -241,8 +268,26 @@ export async function POST(request: NextRequest) {
       content: m.content,
     }));
 
-    // Detect if this is a stock query
-    const stockQuery = detectStockQuery(message);
+    // Detect if this is a stock query — Phase 1: regex, Phase 2: LLM fallback
+    let stockQuery = detectStockQuery(message);
+
+    // Phase 2: If regex missed it, use LLM to classify intent
+    if (!stockQuery) {
+      try {
+        const classification = await withTimeout(
+          classifyIntent(message),
+          3000,
+          "intentClassification"
+        );
+        if (classification?.intent === "stock_query" && classification.company_name) {
+          stockQuery = classification.company_name;
+          console.log(`[chat] NLP classified as stock query: "${classification.company_name}"`);
+        }
+      } catch (err) {
+        console.warn("[chat] Intent classification failed, proceeding as general chat:", err);
+      }
+    }
+
     console.log(`[chat] user=${user.id} stockQuery=${stockQuery} msg="${message.slice(0, 80)}"`);
     let stockAnalysis: StockAnalysis | null = null;
     let stream: ReadableStream<Uint8Array> | null = null;
@@ -297,6 +342,7 @@ export async function POST(request: NextRequest) {
               news,
               macroRisks,
               rawMaterialRisks,
+              companyInfo,
             };
 
             stream = await withTimeout(
@@ -351,7 +397,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const guardedStream = withStreamTimeout(stream!, 25000, "chatStream");
+    const guardedStream = withStreamTimeout(stream!, 45000, "chatStream");
 
     // Create a tee to capture the full response for saving to DB
     const [streamForClient, streamForCapture] = guardedStream.tee();
@@ -434,13 +480,24 @@ export async function POST(request: NextRequest) {
     });
 
     // Return streaming response with conversation metadata in headers
+    const responseHeaders: Record<string, string> = {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "X-Conversation-Id": activeConversationId!,
+      "X-Has-Stock-Data": stockAnalysis ? "true" : "false",
+      "Access-Control-Expose-Headers":
+        "X-Conversation-Id, X-Has-Stock-Data, X-Stock-Quote",
+    };
+
+    if (stockAnalysis) {
+      responseHeaders["X-Stock-Quote"] = encodeURIComponent(
+        JSON.stringify(stockAnalysis.quote)
+      );
+    }
+
     return new Response(streamForClient, {
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Transfer-Encoding": "chunked",
-        "X-Conversation-Id": activeConversationId!,
-        "X-Has-Stock-Data": stockAnalysis ? "true" : "false",
-        "Access-Control-Expose-Headers": "X-Conversation-Id, X-Has-Stock-Data",
+        ...responseHeaders,
       },
     });
   } catch (error) {

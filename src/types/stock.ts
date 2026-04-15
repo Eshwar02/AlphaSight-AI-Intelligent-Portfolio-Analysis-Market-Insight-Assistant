@@ -64,6 +64,15 @@ export interface NewsItem {
   summary: string;
 }
 
+export interface CompanyInfo {
+  sector: string;
+  industry: string;
+  description: string;
+  employees: number | null;
+  website: string;
+  country: string;
+}
+
 export interface StockAnalysis {
   quote: StockQuote;
   history: StockHistory;
@@ -71,6 +80,7 @@ export interface StockAnalysis {
   news: NewsItem[];
   macroRisks: string[];
   rawMaterialRisks: string[];
+  companyInfo?: CompanyInfo;
 }
 
 // ── Portfolio types (DB row + computed fields) ───────────────────────

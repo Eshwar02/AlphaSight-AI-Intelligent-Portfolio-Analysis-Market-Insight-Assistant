@@ -6,7 +6,9 @@
       "Bash(npx tsc:*)",
       "Bash(node:*)",
       "Bash(curl -s http://localhost:3099/api/test-groq)",
-      "Bash(taskkill //f //im node.exe)"
+      "Bash(taskkill //f //im node.exe)",
+      "Bash(npx tsx:*)",
+      "Bash(rm:*)"
     ]
   }
 }
