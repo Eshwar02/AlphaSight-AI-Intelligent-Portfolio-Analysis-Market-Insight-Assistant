@@ -8,7 +8,11 @@
       "Bash(curl -s http://localhost:3099/api/test-groq)",
       "Bash(taskkill //f //im node.exe)",
       "Bash(npx tsx:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(ls .env*)",
+      "WebSearch",
+      "Bash(grep -n \"loadConversation\\\\|stockData\\\\|metadata\" E:/alphasight_ai/src/stores/app-store.ts E:/alphasight_ai/src/lib/hooks/*.ts)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

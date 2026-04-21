@@ -61,6 +61,7 @@ create table portfolio_holdings (
   symbol        text not null,
   quantity      numeric not null,
   avg_buy_price numeric not null,
+  currency      text,
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()

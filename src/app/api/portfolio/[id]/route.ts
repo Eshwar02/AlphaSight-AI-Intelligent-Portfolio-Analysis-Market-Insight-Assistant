@@ -38,9 +38,10 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { quantity, avgBuyPrice, notes } = body as {
+    const { quantity, avgBuyPrice, currency, notes } = body as {
       quantity?: number;
       avgBuyPrice?: number;
+      currency?: string;
       notes?: string;
     };
 
@@ -65,6 +66,18 @@ export async function PUT(
         );
       }
       updates.avg_buy_price = avgBuyPrice;
+    }
+
+    if (currency !== undefined) {
+      const ALLOWED = ["USD", "INR", "EUR", "GBP"] as const;
+      const upper = currency ? currency.toUpperCase() : null;
+      if (upper && !ALLOWED.includes(upper as typeof ALLOWED[number])) {
+        return NextResponse.json(
+          { error: "Invalid currency" },
+          { status: 400 }
+        );
+      }
+      updates.currency = upper;
     }
 
     if (notes !== undefined) {

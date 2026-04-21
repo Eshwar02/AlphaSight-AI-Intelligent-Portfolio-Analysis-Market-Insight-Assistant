@@ -5,7 +5,12 @@ import { fetchQuote, fetchHistory, fetchCompanyInfo } from "@/lib/stock/data";
 import { analyzeTechnicals } from "@/lib/stock/technicals";
 import { fetchStockNews } from "@/lib/stock/news";
 import { assessMacroRisks, assessRawMaterialRisks } from "@/lib/stock/macro";
-import { streamStockAnalysis, streamGeneralChat, validateGroqSetup, classifyIntent } from "@/lib/ai/groq";
+import {
+  streamStockAnalysis,
+  streamGeneralChat,
+  validateGeminiSetup,
+  classifyIntent,
+} from "@/lib/ai/gemini";
 import type { StockAnalysis } from "@/types/stock";
 
 // Regex patterns for detecting stock queries
@@ -189,12 +194,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`[chat] New message from user ${user.id}: "${message.slice(0, 50)}..."`);
 
-    // Validate Groq setup early
-    const groqValidation = validateGroqSetup();
-    if (!groqValidation.valid) {
-      console.error("[chat] Groq validation failed:", groqValidation.error);
+    // Validate Gemini setup early
+    const geminiValidation = validateGeminiSetup();
+    if (!geminiValidation.valid) {
+      console.error("[chat] Gemini validation failed:", geminiValidation.error);
       return NextResponse.json(
-        { error: "LLM service not configured", details: groqValidation.error },
+        { error: "LLM service not configured", details: geminiValidation.error },
         { status: 503 }
       );
     }
@@ -399,103 +404,135 @@ export async function POST(request: NextRequest) {
 
     const guardedStream = withStreamTimeout(stream!, 45000, "chatStream");
 
-    // Create a tee to capture the full response for saving to DB
-    const [streamForClient, streamForCapture] = guardedStream.tee();
+    // Fork the stream: forward chunks to the client while also capturing text
+    // into an in-memory buffer for DB persistence. This avoids the backpressure
+    // coupling that `tee()` introduces — if the client slows down or
+    // disconnects, the capture still holds whatever was already enqueued.
+    const capturedChunks: string[] = [];
+    const decoder = new TextDecoder();
 
-    // Save the AI response asynchronously after streaming completes
-    const saveResponsePromise = (async () => {
-      const reader = streamForCapture.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = "";
+    const runSave = async () => {
+      const fullResponse = capturedChunks.join("");
+      console.log(
+        `[chat] capture done: ${fullResponse.length} chars, preview=${JSON.stringify(fullResponse.slice(0, 100))}`
+      );
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          fullResponse += decoder.decode(value, { stream: true });
-        }
-      } finally {
-        reader.releaseLock();
+      if (fullResponse.trim().length === 0) {
+        console.warn(
+          `[chat] SKIPPED saving assistant message: empty response (raw length=${fullResponse.length})`
+        );
+        return;
       }
 
-      if (fullResponse.trim().length > 0) {
-        // Build metadata including stock data for inline cards
-        const metadata: Record<string, unknown> = {};
-        if (stockAnalysis) {
-          metadata.stockData = [
-            {
-              symbol: stockAnalysis.quote.symbol,
-              name: stockAnalysis.quote.name,
-              price: stockAnalysis.quote.price,
-              change: stockAnalysis.quote.change,
-              changePercent: stockAnalysis.quote.changePercent,
-              volume: stockAnalysis.quote.volume,
-              marketCap: stockAnalysis.quote.marketCap,
-              pe: stockAnalysis.quote.pe,
-              high52: stockAnalysis.quote.high52,
-              low52: stockAnalysis.quote.low52,
-              dayHigh: stockAnalysis.quote.dayHigh,
-              dayLow: stockAnalysis.quote.dayLow,
-              open: stockAnalysis.quote.open,
-              previousClose: stockAnalysis.quote.previousClose,
-              currency: stockAnalysis.quote.currency,
-              exchange: stockAnalysis.quote.exchange,
-            },
-          ];
-          metadata.technicals = {
-            sma20: stockAnalysis.technicals.sma20,
-            sma50: stockAnalysis.technicals.sma50,
-            rsi: stockAnalysis.technicals.rsi,
-            trend: stockAnalysis.technicals.trend,
-            supportLevels: stockAnalysis.technicals.supportLevels,
-            resistanceLevels: stockAnalysis.technicals.resistanceLevels,
-          };
-          metadata.news = stockAnalysis.news.map((n) => ({
-            title: n.title,
-            url: n.url,
-            source: n.source,
-            publishedAt: n.publishedAt,
-          }));
-        }
+      const metadata: Record<string, unknown> = {};
+      if (stockAnalysis) {
+        metadata.stockData = [
+          {
+            symbol: stockAnalysis.quote.symbol,
+            name: stockAnalysis.quote.name,
+            price: stockAnalysis.quote.price,
+            change: stockAnalysis.quote.change,
+            changePercent: stockAnalysis.quote.changePercent,
+            volume: stockAnalysis.quote.volume,
+            marketCap: stockAnalysis.quote.marketCap,
+            pe: stockAnalysis.quote.pe,
+            high52: stockAnalysis.quote.high52,
+            low52: stockAnalysis.quote.low52,
+            dayHigh: stockAnalysis.quote.dayHigh,
+            dayLow: stockAnalysis.quote.dayLow,
+            open: stockAnalysis.quote.open,
+            previousClose: stockAnalysis.quote.previousClose,
+            currency: stockAnalysis.quote.currency,
+            exchange: stockAnalysis.quote.exchange,
+          },
+        ];
+        metadata.technicals = {
+          sma20: stockAnalysis.technicals.sma20,
+          sma50: stockAnalysis.technicals.sma50,
+          rsi: stockAnalysis.technicals.rsi,
+          trend: stockAnalysis.technicals.trend,
+          supportLevels: stockAnalysis.technicals.supportLevels,
+          resistanceLevels: stockAnalysis.technicals.resistanceLevels,
+        };
+        metadata.news = stockAnalysis.news.map((n) => ({
+          title: n.title,
+          url: n.url,
+          source: n.source,
+          publishedAt: n.publishedAt,
+        }));
+      }
 
-        await supabase.from("messages").insert({
-          conversation_id: activeConversationId!,
-          role: "assistant",
-          content: fullResponse,
-          metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      console.log(
+        `[chat] inserting assistant message, content.length=${fullResponse.length}, hasMetadata=${Object.keys(metadata).length > 0}`
+      );
+
+      await supabase.from("messages").insert({
+        conversation_id: activeConversationId!,
+        role: "assistant",
+        content: fullResponse,
+        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      });
+
+      await supabase
+        .from("conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", activeConversationId!);
+    };
+
+    const forkedStream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const reader = guardedStream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              capturedChunks.push(decoder.decode(value, { stream: true }));
+              controller.enqueue(value);
+            }
+          }
+          controller.close();
+        } catch (err) {
+          console.error("[chat] forked stream error:", err);
+          try {
+            controller.close();
+          } catch {
+            // already closed
+          }
+        } finally {
+          reader.releaseLock();
+          // Save whatever we captured — even partial content on disconnect —
+          // so the user's reply isn't lost.
+          runSave().catch((err) => {
+            console.error("Failed to save AI response:", err);
+          });
+        }
+      },
+      cancel() {
+        // Client disconnected. Save whatever we have so far.
+        runSave().catch((err) => {
+          console.error("Failed to save AI response after cancel:", err);
         });
-
-        // Update conversation timestamp
-        await supabase
-          .from("conversations")
-          .update({ updated_at: new Date().toISOString() })
-          .eq("id", activeConversationId!);
-      }
-    })();
-
-    // Don't await the save -- let it run in the background
-    // Use waitUntil pattern if available, otherwise just fire-and-forget
-    saveResponsePromise.catch((err) => {
-      console.error("Failed to save AI response:", err);
+      },
     });
 
-    // Return streaming response with conversation metadata in headers
+    // Short, header-safe metadata for the client to render the chart
+    // immediately. Full quote data is rehydrated from DB metadata on page load.
     const responseHeaders: Record<string, string> = {
       "Content-Type": "text/plain; charset=utf-8",
       "Transfer-Encoding": "chunked",
       "X-Conversation-Id": activeConversationId!,
       "X-Has-Stock-Data": stockAnalysis ? "true" : "false",
       "Access-Control-Expose-Headers":
-        "X-Conversation-Id, X-Has-Stock-Data, X-Stock-Quote",
+        "X-Conversation-Id, X-Has-Stock-Data, X-Stock-Symbol, X-Stock-Exchange",
     };
 
     if (stockAnalysis) {
-      responseHeaders["X-Stock-Quote"] = encodeURIComponent(
-        JSON.stringify(stockAnalysis.quote)
-      );
+      responseHeaders["X-Stock-Symbol"] = stockAnalysis.quote.symbol;
+      responseHeaders["X-Stock-Exchange"] = stockAnalysis.quote.exchange || "";
     }
 
-    return new Response(streamForClient, {
+    return new Response(forkedStream, {
       headers: {
         ...responseHeaders,
       },

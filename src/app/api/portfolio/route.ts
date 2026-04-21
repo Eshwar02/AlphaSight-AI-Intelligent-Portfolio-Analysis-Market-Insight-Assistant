@@ -121,12 +121,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { symbol, quantity, avgBuyPrice, notes } = body as {
+    const { symbol, quantity, avgBuyPrice, currency, notes } = body as {
       symbol?: string;
       quantity?: number;
       avgBuyPrice?: number;
+      currency?: string;
       notes?: string;
     };
+
+    const ALLOWED_CURRENCIES = ["USD", "INR", "EUR", "GBP"] as const;
+    const normalizedCurrency =
+      currency && ALLOWED_CURRENCIES.includes(currency.toUpperCase() as typeof ALLOWED_CURRENCIES[number])
+        ? currency.toUpperCase()
+        : null;
 
     // Validate inputs
     if (!symbol || typeof symbol !== "string") {
@@ -194,6 +201,7 @@ export async function POST(request: NextRequest) {
         symbol: resolvedSymbol,
         quantity,
         avg_buy_price: avgBuyPrice,
+        currency: normalizedCurrency,
         notes: notes || null,
       })
       .select("*")

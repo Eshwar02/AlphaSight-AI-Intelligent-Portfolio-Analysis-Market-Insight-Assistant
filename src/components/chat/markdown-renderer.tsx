@@ -10,6 +10,13 @@ import { cn } from '@/lib/utils';
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+  /**
+   * When true, syntax highlighting is skipped. rehype-highlight can throw on
+   * partial code fences while the stream is still in flight, which crashes
+   * the whole render subtree and leaves the bubble blank. Enable highlighting
+   * only once the stream has finished.
+   */
+  streaming?: boolean;
 }
 
 function CodeBlock({
@@ -72,7 +79,11 @@ function CodeBlock({
   );
 }
 
-export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className, streaming = false }: MarkdownRendererProps) {
+  const rehypePlugins = streaming
+    ? []
+    : [[rehypeHighlight, { ignoreMissing: true, detect: true }] as const];
+
   return (
     <div
       className={cn(
@@ -93,7 +104,8 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rehypePlugins={rehypePlugins as any}
         components={{
           code: CodeBlock as any,
           table: ({ children, ...props }) => (

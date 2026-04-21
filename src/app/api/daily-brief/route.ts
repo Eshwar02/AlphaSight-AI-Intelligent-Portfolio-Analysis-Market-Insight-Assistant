@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchQuote } from "@/lib/stock/data";
 import { assessMacroRisks } from "@/lib/stock/macro";
-import { generateDailyBrief } from "@/lib/ai/groq";
+import { generateDailyBrief } from "@/lib/ai/gemini";
 import type { PortfolioSnapshot, PortfolioSnapshotItem } from "@/types/stock";
 // Types
 

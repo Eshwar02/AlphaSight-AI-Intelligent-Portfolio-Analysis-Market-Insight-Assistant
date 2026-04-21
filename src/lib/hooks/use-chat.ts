@@ -77,16 +77,17 @@ export function useChat() {
           throw new Error(`Chat request failed: ${res.status} - ${errorMsg}`);
         }
 
-        const stockQuoteHeader = res.headers.get('x-stock-quote');
-        if (stockQuoteHeader) {
-          try {
-            const parsed = JSON.parse(
-              decodeURIComponent(stockQuoteHeader),
-            ) as NonNullable<ChatMessage['stockData']>[number];
-            updateMessage(assistantMsg.id, { stockData: [parsed] });
-          } catch {
-            // Ignore malformed stock quote header; text streaming still works.
-          }
+        // The server sends a short placeholder so the chart can render
+        // immediately. Full quote data is rehydrated from DB metadata when the
+        // conversation loads (see providers.tsx).
+        const stockSymbol = res.headers.get('x-stock-symbol');
+        const stockExchange = res.headers.get('x-stock-exchange') || '';
+        if (stockSymbol) {
+          const placeholder = {
+            symbol: stockSymbol,
+            exchange: stockExchange,
+          } as NonNullable<ChatMessage['stockData']>[number];
+          updateMessage(assistantMsg.id, { stockData: [placeholder] });
         }
 
         const newConvId = res.headers.get('x-conversation-id');

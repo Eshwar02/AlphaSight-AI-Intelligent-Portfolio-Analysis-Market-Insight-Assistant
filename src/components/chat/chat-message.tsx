@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { User, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from './markdown-renderer';
+import { MarkdownErrorBoundary } from './markdown-error-boundary';
 import { StockCard } from './stock-card';
 import { ChartWidget } from './chart-widget';
 import type { ChatMessage as ChatMessageType } from '@/stores/app-store';
@@ -74,12 +75,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </div>
           ) : (
             <div>
-              {/* Stock cards rendered above the markdown when present */}
+              {/* Stock cards rendered above the markdown when present.
+                  Only show once full quote data is available — during a live
+                  response the server sends just symbol+exchange so the chart
+                  can render immediately; full fields arrive on DB reload. */}
               {stockData && stockData.length > 0 && (
                 <div className="mb-3">
-                  {stockData.map((stock) => (
-                    <StockCard key={stock.symbol} stock={stock} />
-                  ))}
+                  {stockData.map((stock) =>
+                    typeof stock.price === 'number' ? (
+                      <StockCard key={stock.symbol} stock={stock} />
+                    ) : null,
+                  )}
                 </div>
               )}
 
@@ -88,7 +94,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
               )}
 
               {hasContent ? (
-                <MarkdownRenderer content={message.content} />
+                <MarkdownErrorBoundary content={message.content}>
+                  <MarkdownRenderer
+                    content={message.content}
+                    streaming={isStreaming}
+                  />
+                </MarkdownErrorBoundary>
               ) : isStreaming ? (
                 <div className="flex items-center gap-1 py-1">
                   <span className="inline-flex gap-1">

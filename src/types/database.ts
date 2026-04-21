@@ -75,6 +75,7 @@ export type Database = {
           symbol: string;
           quantity: number;
           avg_buy_price: number;
+          currency: string | null;
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -85,6 +86,7 @@ export type Database = {
           symbol: string;
           quantity: number;
           avg_buy_price: number;
+          currency?: string | null;
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -95,6 +97,7 @@ export type Database = {
           symbol?: string;
           quantity?: number;
           avg_buy_price?: number;
+          currency?: string | null;
           notes?: string | null;
           created_at?: string;
           updated_at?: string;

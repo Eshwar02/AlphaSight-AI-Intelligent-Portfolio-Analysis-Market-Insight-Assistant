@@ -12,27 +12,81 @@ interface ChartWidgetProps {
 
 /**
  * Convert Yahoo Finance symbol to TradingView format.
- * RELIANCE.NS → NSE:RELIANCE, AAPL + NMS → NASDAQ:AAPL
+ * TradingView requires an exchange prefix for reliable resolution — a bare
+ * ticker like "AAPL" often fails to render. We map common Yahoo suffix and
+ * exchange codes; when the exchange is unknown but the symbol looks US-listed
+ * we default to NASDAQ (TradingView will auto-redirect to NYSE/AMEX if needed).
  */
 function toTradingViewSymbol(yahooSymbol: string, exchange?: string): string {
-  if (yahooSymbol.endsWith('.NS')) {
-    return `NSE:${yahooSymbol.replace('.NS', '')}`;
+  // ── Suffix-based routing (exchange hint embedded in the ticker) ──
+  const suffixMap: Record<string, string> = {
+    '.NS': 'NSE',
+    '.BO': 'BSE',
+    '.L': 'LSE',
+    '.TO': 'TSX',
+    '.V': 'TSXV',
+    '.HK': 'HKEX',
+    '.T': 'TSE',
+    '.SS': 'SSE',
+    '.SZ': 'SZSE',
+    '.PA': 'EURONEXT',
+    '.AS': 'EURONEXT',
+    '.BR': 'EURONEXT',
+    '.DE': 'XETR',
+    '.F': 'FWB',
+    '.MI': 'MIL',
+    '.MC': 'BME',
+    '.SW': 'SIX',
+    '.AX': 'ASX',
+    '.NZ': 'NZX',
+    '.SA': 'BMFBOVESPA',
+  };
+  for (const [suffix, prefix] of Object.entries(suffixMap)) {
+    if (yahooSymbol.endsWith(suffix)) {
+      return `${prefix}:${yahooSymbol.slice(0, -suffix.length)}`;
+    }
   }
-  if (yahooSymbol.endsWith('.BO')) {
-    return `BSE:${yahooSymbol.replace('.BO', '')}`;
+
+  // Crypto pairs (e.g. BTC-USD) — TradingView uses BINANCE/COINBASE prefixes
+  if (/^[A-Z]+-USD$/.test(yahooSymbol)) {
+    return `BINANCE:${yahooSymbol.replace('-USD', 'USDT')}`;
   }
+
+  // ── Exchange-based routing for US tickers ──
   if (exchange) {
     const ex = exchange.toUpperCase();
-    if (ex.includes('NASDAQ') || ex === 'NMS' || ex === 'NGM' || ex === 'NCM') {
+    if (
+      ex.includes('NASDAQ') ||
+      ex === 'NMS' ||
+      ex === 'NGM' ||
+      ex === 'NCM' ||
+      ex === 'NAS'
+    ) {
       return `NASDAQ:${yahooSymbol}`;
     }
-    if (ex.includes('NYSE') || ex === 'NYQ' || ex === 'NYS') {
+    if (
+      ex.includes('NYSE') ||
+      ex === 'NYQ' ||
+      ex === 'NYS' ||
+      ex === 'PCX' ||
+      ex === 'ARCA' ||
+      ex === 'NYSEARCA' ||
+      ex === 'BATS'
+    ) {
       return `NYSE:${yahooSymbol}`;
     }
     if (ex.includes('AMEX') || ex === 'ASE') {
       return `AMEX:${yahooSymbol}`;
     }
   }
+
+  // Unknown exchange but looks like a US ticker (no suffix, uppercase letters
+  // only) — default to NASDAQ. TradingView's resolver will surface the
+  // correct listing, and `allow_symbol_change: true` lets users adjust.
+  if (/^[A-Z][A-Z0-9.-]{0,9}$/.test(yahooSymbol) && !yahooSymbol.includes('.')) {
+    return `NASDAQ:${yahooSymbol}`;
+  }
+
   return yahooSymbol;
 }
 

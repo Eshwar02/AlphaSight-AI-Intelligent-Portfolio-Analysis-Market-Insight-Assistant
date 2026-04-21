@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { Eye, EyeOff, TrendingUp, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -81,9 +81,11 @@ function LoginPageContent() {
             className="text-center mb-8"
           >
             <div className="inline-flex items-center gap-2 mb-3">
-              <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
-              </div>
+              <img
+                src="/logo.svg"
+                alt="AlphaSight AI"
+                className="w-10 h-10 rounded-xl"
+              />
               <h1 className="text-2xl font-bold text-gray-100 tracking-tight">
                 AlphaSight AI
               </h1>

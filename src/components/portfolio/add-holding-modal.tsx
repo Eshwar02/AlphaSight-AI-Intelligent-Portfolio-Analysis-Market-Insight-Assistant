@@ -29,6 +29,8 @@ function AddHoldingModal({
   const [symbol, setSymbol] = useState('');
   const [quantity, setQuantity] = useState('');
   const [avgBuyPrice, setAvgBuyPrice] = useState('');
+  const [currency, setCurrency] = useState<'USD' | 'INR' | 'EUR' | 'GBP'>('USD');
+  const [currencyTouched, setCurrencyTouched] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -46,17 +48,40 @@ function AddHoldingModal({
       setSymbol(editingHolding.symbol);
       setQuantity(String(editingHolding.quantity));
       setAvgBuyPrice(String(editingHolding.avg_buy_price));
+      setCurrency(
+        (editingHolding.currency as 'USD' | 'INR' | 'EUR' | 'GBP' | null) ||
+          'USD',
+      );
+      setCurrencyTouched(true);
       setNotes(editingHolding.notes || '');
     } else {
       setSymbol('');
       setQuantity('');
       setAvgBuyPrice('');
+      setCurrency('USD');
+      setCurrencyTouched(false);
       setNotes('');
     }
     setError('');
     setSuggestions([]);
     setShowSuggestions(false);
   }, [editingHolding, open]);
+
+  // Auto-detect currency from symbol suffix unless the user has overridden it.
+  useEffect(() => {
+    if (currencyTouched) return;
+    const upper = symbol.toUpperCase();
+    if (upper.endsWith('.NS') || upper.endsWith('.BO')) setCurrency('INR');
+    else if (upper.endsWith('.L')) setCurrency('GBP');
+    else if (
+      upper.endsWith('.PA') ||
+      upper.endsWith('.DE') ||
+      upper.endsWith('.AS') ||
+      upper.endsWith('.MI')
+    )
+      setCurrency('EUR');
+    else setCurrency('USD');
+  }, [symbol, currencyTouched]);
 
   const searchSymbols = useCallback(async (query: string) => {
     if (query.length < 1) {
@@ -129,6 +154,7 @@ function AddHoldingModal({
           symbol: symbol.trim().toUpperCase(),
           quantity: Number(quantity),
           avgBuyPrice: Number(avgBuyPrice),
+          currency,
           notes: notes.trim() || null,
         }),
       });
@@ -206,15 +232,36 @@ function AddHoldingModal({
           step="any"
         />
 
-        <Input
-          label="Average Buy Price"
-          type="number"
-          placeholder="150.00"
-          value={avgBuyPrice}
-          onChange={(e) => setAvgBuyPrice(e.target.value)}
-          min="0"
-          step="any"
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-300">
+            Average Buy Price
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              placeholder="150.00"
+              value={avgBuyPrice}
+              onChange={(e) => setAvgBuyPrice(e.target.value)}
+              min="0"
+              step="any"
+              className="flex-1 rounded-lg border border-dark-700 bg-dark-850 px-3 py-2 text-sm text-gray-100 placeholder:text-dark-500 focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green transition-colors"
+            />
+            <select
+              aria-label="Currency"
+              value={currency}
+              onChange={(e) => {
+                setCurrency(e.target.value as 'USD' | 'INR' | 'EUR' | 'GBP');
+                setCurrencyTouched(true);
+              }}
+              className="w-24 rounded-lg border border-dark-700 bg-dark-850 px-2 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green transition-colors"
+            >
+              <option value="USD">$ USD</option>
+              <option value="INR">₹ INR</option>
+              <option value="EUR">€ EUR</option>
+              <option value="GBP">£ GBP</option>
+            </select>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-gray-300">
