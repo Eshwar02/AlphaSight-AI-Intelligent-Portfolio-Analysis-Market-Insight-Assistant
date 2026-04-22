@@ -1,0 +1,13 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lens-grad" x1="100" y1="40" x2="100" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <!-- Minimalist Alpha (a) that looks like a lens focus -->
+  <path d="M140 100C140 122.091 122.091 140 100 140C77.9086 140 60 122.091 60 100C60 77.9086 77.9086 60 100 60" stroke="url(#lens-grad)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M140 60V140" stroke="url(#lens-grad)" stroke-width="10" stroke-linecap="round"/>
+  <!-- Subtle Dot for AI/Intelligence -->
+  <circle cx="140" cy="60" r="5" fill="#3b82f6"/>
+</svg>

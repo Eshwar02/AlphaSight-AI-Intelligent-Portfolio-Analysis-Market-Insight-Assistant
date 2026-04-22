@@ -2,7 +2,6 @@
 
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from './markdown-renderer';
 import { MarkdownErrorBoundary } from './markdown-error-boundary';
@@ -14,108 +13,167 @@ interface ChatMessageProps {
   message: ChatMessageType;
 }
 
+const EMPTY_RESPONSE_FALLBACK =
+  'Unable to generate analysis right now. Showing available data below.';
+
+/**
+ * Assistant "avatar" — a simple sparkle mark in the brand teal. Replaces the
+ * Bot-in-a-circle so the layout reads as plain text (Claude-style) rather
+ * than a chat bubble with an icon chip.
+ */
+function AssistantMark() {
+  return (
+    <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className="h-[18px] w-[18px] text-accent-brand"
+        aria-hidden="true"
+      >
+        <path
+          d="M12 2.5 13.6 9.2 20.3 10.8 13.6 12.4 12 19.1 10.4 12.4 3.7 10.8 10.4 9.2 12 2.5Z"
+          fill="currentColor"
+          fillOpacity="0.9"
+        />
+        <path
+          d="M18.5 3.2 19.1 5.5 21.4 6.1 19.1 6.7 18.5 9 17.9 6.7 15.6 6.1 17.9 5.5 18.5 3.2Z"
+          fill="currentColor"
+          fillOpacity="0.6"
+        />
+      </svg>
+    </div>
+  );
+}
+
+function StreamingDots() {
+  return (
+    <div className="flex items-center gap-1 py-2">
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-brand [animation-delay:0ms]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-brand [animation-delay:150ms]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-brand [animation-delay:300ms]" />
+    </div>
+  );
+}
+
 function TypingCursor() {
   return (
-    <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-gray-400" />
-  );
-}
-
-function UserAvatar() {
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-green/20">
-      <User className="h-3.5 w-3.5 text-accent-green" />
-    </div>
-  );
-}
-
-function AssistantAvatar() {
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-dark-700">
-      <Bot className="h-3.5 w-3.5 text-gray-300" />
-    </div>
+    <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-[3px] animate-pulse bg-accent-brand/70" />
   );
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isStreaming = message.isStreaming;
-  const hasContent = message.content.length > 0;
+  const hasContent = message.content.trim().length > 0;
 
-  // Parse stock data from metadata if available
   const stockData = useMemo(() => {
     if (!message.stockData) return null;
     return message.stockData;
   }, [message.stockData]);
+  const newsData = useMemo(() => {
+    if (!message.newsData || message.newsData.length === 0) return null;
+    return message.newsData;
+  }, [message.newsData]);
   const primarySymbol = stockData?.[0]?.symbol;
+
+  const showEnhancements = hasContent;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="group px-4 py-5"
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className={cn(
+        'px-4 sm:px-6',
+        isUser ? 'py-2' : 'py-4',
+      )}
     >
-      <div className="mx-auto flex max-w-3xl gap-4">
-        {/* Avatar */}
-        <div className="mt-0.5 shrink-0">
-          {isUser ? <UserAvatar /> : <AssistantAvatar />}
-        </div>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          {/* Role label */}
-          <div className="mb-1.5 text-xs font-semibold text-gray-300">
-            {isUser ? 'You' : 'AlphaSight'}
+      {isUser ? (
+        /* ── User: right-aligned rounded pill ───────────────────────── */
+        <div className="mx-auto flex max-w-3xl justify-end">
+          <div
+            className={cn(
+              'max-w-[85%] whitespace-pre-wrap break-words',
+              'rounded-2xl rounded-tr-md bg-dark-800 px-4 py-2.5',
+              'text-[15px] leading-relaxed text-gray-100',
+              'border border-dark-700/60',
+              'shadow-[0_1px_0_rgba(0,0,0,0.2)]',
+            )}
+          >
+            {message.content}
           </div>
-
-          {/* Message body */}
-          {isUser ? (
-            <div className="text-sm leading-7 text-gray-200">
-              {message.content}
-            </div>
-          ) : (
-            <div>
-              {/* Stock cards rendered above the markdown when present.
-                  Only show once full quote data is available — during a live
-                  response the server sends just symbol+exchange so the chart
-                  can render immediately; full fields arrive on DB reload. */}
-              {stockData && stockData.length > 0 && (
-                <div className="mb-3">
-                  {stockData.map((stock) =>
-                    typeof stock.price === 'number' ? (
-                      <StockCard key={stock.symbol} stock={stock} />
-                    ) : null,
-                  )}
-                </div>
-              )}
-
-              {primarySymbol && (
-                <ChartWidget symbol={primarySymbol} exchange={stockData?.[0]?.exchange} height={320} />
-              )}
-
-              {hasContent ? (
+        </div>
+      ) : (
+        /* ── Assistant: plain text, no bubble, sparkle mark on the left ── */
+        <div className="mx-auto flex max-w-3xl gap-3">
+          <AssistantMark />
+          <div className="min-w-0 flex-1">
+            {/* Body */}
+            {hasContent ? (
+              <div className="text-[15px] leading-7 text-gray-200">
                 <MarkdownErrorBoundary content={message.content}>
                   <MarkdownRenderer
                     content={message.content}
                     streaming={isStreaming}
                   />
                 </MarkdownErrorBoundary>
-              ) : isStreaming ? (
-                <div className="flex items-center gap-1 py-1">
-                  <span className="inline-flex gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-dark-400 [animation-delay:0ms]" />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-dark-400 [animation-delay:150ms]" />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-dark-400 [animation-delay:300ms]" />
-                  </span>
-                </div>
-              ) : null}
+                {isStreaming && <TypingCursor />}
+              </div>
+            ) : isStreaming ? (
+              <StreamingDots />
+            ) : (
+              <div className="text-[15px] leading-7 text-gray-200">
+                {EMPTY_RESPONSE_FALLBACK}
+              </div>
+            )}
 
-              {/* Blinking cursor during streaming with content */}
-              {isStreaming && hasContent && <TypingCursor />}
-            </div>
-          )}
+            {/* Stock card and chart are optional enhancements after text */}
+            {showEnhancements && stockData && stockData.length > 0 && (
+              <div className="mt-4">
+                {stockData.map((stock) =>
+                  typeof stock.price === 'number' ? (
+                    <StockCard key={stock.symbol} stock={stock} />
+                  ) : null,
+                )}
+              </div>
+            )}
+
+            {showEnhancements && primarySymbol && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-dark-700/60">
+                <ChartWidget
+                  symbol={primarySymbol}
+                  exchange={stockData?.[0]?.exchange}
+                  height={320}
+                />
+              </div>
+            )}
+
+            {showEnhancements && newsData && (
+              <div className="mt-4 space-y-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-dark-400">
+                  Related News
+                </h4>
+                <div className="space-y-2">
+                  {newsData.slice(0, 5).map((item) => (
+                    <a
+                      key={`${item.url}-${item.publishedAt}`}
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-lg border border-dark-700/60 bg-dark-900/30 px-3 py-2 transition-colors hover:border-dark-600"
+                    >
+                      <p className="text-sm text-gray-200">{item.title}</p>
+                      <p className="mt-1 text-xs text-dark-400">
+                        {item.source} · {new Date(item.publishedAt).toLocaleDateString()}
+                      </p>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAppStore } from '@/stores/app-store';
 import type { ChatMessage } from '@/stores/app-store';
 import type { Json } from '@/types/database';
@@ -15,6 +16,23 @@ export function Providers({ children }: ProvidersProps) {
   const activeConversationId = useAppStore((s) => s.activeConversationId);
   const setMessages = useAppStore((s) => s.setMessages);
   const setIsLoadingConversation = useAppStore((s) => s.setIsLoadingConversation);
+  const setActiveConversation = useAppStore((s) => s.setActiveConversation);
+  const setActiveView = useAppStore((s) => s.setActiveView);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!pathname) return;
+    const chatPath = pathname.match(/^\/chat\/([^/]+)$/);
+    if (chatPath?.[1]) {
+      setActiveConversation(chatPath[1]);
+      setActiveView('chat');
+      return;
+    }
+    if (pathname === '/') {
+      setActiveConversation(null);
+      setActiveView('chat');
+    }
+  }, [pathname, setActiveConversation, setActiveView]);
 
   // Close sidebar on small screens by default
   useEffect(() => {
@@ -82,10 +100,22 @@ export function Providers({ children }: ProvidersProps) {
                 : rawStockData
                   ? [rawStockData]
                   : undefined;
+              const rawNews =
+                message.metadata &&
+                typeof message.metadata === 'object' &&
+                !Array.isArray(message.metadata)
+                  ? (
+                      message.metadata as {
+                        news?: unknown;
+                      }
+                    ).news
+                  : undefined;
+              const newsData = Array.isArray(rawNews) ? rawNews : undefined;
 
               return {
                 ...message,
                 ...(stockData ? { stockData: stockData as ChatMessage['stockData'] } : {}),
+                ...(newsData ? { newsData: newsData as ChatMessage['newsData'] } : {}),
               };
             }
           );

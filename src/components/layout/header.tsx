@@ -5,12 +5,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Menu, LogOut, User, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 
 export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const setActiveView = useAppStore((s) => s.setActiveView);
   const [menuOpen, setMenuOpen] = useState(false);
   const [initial, setInitial] = useState('A');
   const menuRef = useRef<HTMLDivElement>(null);
@@ -59,74 +61,88 @@ export function Header() {
       router.back();
       return;
     }
+    setActiveView('chat');
     router.push('/');
-  }, [router]);
+  }, [router, setActiveView]);
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-dark-700/50 bg-dark-900 px-3">
-      {/* ── Left: sidebar + navigation ─────────── */}
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-dark-800/80 bg-dark-900/80 px-3 backdrop-blur">
+      {/* ── Left: sidebar toggle + back ──────── */}
       <div className="flex items-center gap-1">
         <button
           onClick={toggleSidebar}
-          className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-dark-850 hover:text-gray-200"
+          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-dark-850 hover:text-gray-100"
           aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
         >
-          <Menu size={18} />
+          <Menu size={17} />
         </button>
         {pathname !== '/' && (
           <button
             onClick={handleBack}
-            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-dark-850 hover:text-gray-200"
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-dark-850 hover:text-gray-100"
             aria-label="Go back"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={17} />
           </button>
         )}
       </div>
 
-      {/* ── Center: model label ────────────────── */}
-      <div className="flex-1 text-center md:flex-none">
-        <button
-          onClick={() => router.push('/')}
-          className="text-sm font-medium text-gray-400 transition-colors hover:text-gray-200"
-          aria-label="Go to chat home"
-        >
-          AlphaSight Pro
-        </button>
-      </div>
+      {/* ── Center: compact brand (clickable) ── */}
+      <button
+        onClick={() => {
+          setActiveView('chat');
+          router.push('/');
+        }}
+        className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-gray-300 transition-colors hover:bg-dark-850 hover:text-gray-100"
+        aria-label="Go to chat home"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-accent-brand" />
+        <span>AlphaSight</span>
+        <span className="text-dark-500">/</span>
+        <span className="text-dark-400">Pro</span>
+      </button>
 
-      {/* ── Right: user menu ───────────────────── */}
-      <div ref={menuRef} className="relative ml-auto">
-        <button
-          onClick={() => setMenuOpen((p) => !p)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-green text-sm font-semibold text-dark-950 transition-opacity hover:opacity-90"
-          aria-label="User menu"
-        >
-          {initial}
-        </button>
+      {/* ── Right: theme toggle + user avatar + menu ────────── */}
+      <div className="flex items-center gap-2">
+        <ThemeSwitch />
+        <div ref={menuRef} className="relative">
+          <button
+            onClick={() => setMenuOpen((p) => !p)}
+            className={cn(
+              'flex h-8 w-8 items-center justify-center rounded-full',
+              'bg-accent-brand text-sm font-semibold text-dark-950',
+              'ring-1 ring-accent-brand/50 ring-offset-2 ring-offset-dark-900',
+              'transition-transform hover:scale-105',
+            )}
+            aria-label="User menu"
+          >
+            {initial}
+          </button>
 
-        {menuOpen && (
-          <div className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-lg border border-dark-700 bg-dark-800 py-1 shadow-xl">
-            <button
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-300 transition-colors hover:bg-dark-850"
-              onClick={() => {
-                setMenuOpen(false);
-                router.push('/settings');
-              }}
-            >
-              <User size={15} />
-              <span>Profile</span>
-            </button>
-            <div className="my-1 border-t border-dark-700" />
-            <button
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-400 transition-colors hover:bg-dark-850"
-              onClick={() => void handleSignOut()}
-            >
-              <LogOut size={15} />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        )}
+          {menuOpen && (
+            <div className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-xl border border-dark-800 bg-dark-900 py-1 shadow-2xl shadow-black/40">
+              <button
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-gray-300 transition-colors hover:bg-dark-850"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setActiveView('settings');
+                  router.push('/');
+                }}
+              >
+                <User size={14} />
+                <span>Profile</span>
+              </button>
+              <div className="my-1 border-t border-dark-800" />
+              <button
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 transition-colors hover:bg-dark-850"
+                onClick={() => void handleSignOut()}
+              >
+                <LogOut size={14} />
+                <span>Sign out</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

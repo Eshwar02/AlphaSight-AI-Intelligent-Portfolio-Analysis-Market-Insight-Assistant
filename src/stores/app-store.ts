@@ -3,13 +3,17 @@
 import { create } from 'zustand';
 import type { Conversation, Message, Json } from '@/types/database';
 import type { StockQuote } from '@/types/stock';
+import type { NewsItem } from '@/types/stock';
 
 // ── Extended chat message with client-side fields ──────────────────
 
 export interface ChatMessage extends Message {
   isStreaming?: boolean;
   stockData?: StockQuote[];
+  newsData?: NewsItem[];
 }
+
+export type AppView = 'chat' | 'portfolio' | 'brief' | 'watchlist' | 'settings';
 
 // ── Store shape ────────────────────────────────────────────────────
 
@@ -18,6 +22,8 @@ interface AppState {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
+  activeView: AppView;
+  setActiveView: (view: AppView) => void;
 
   /* ── Conversations ────────────────────────── */
   conversations: Conversation[];
@@ -45,6 +51,10 @@ interface AppState {
 
   /* ── Loading ──────────────────────────────── */
   setIsLoadingConversation: (v: boolean) => void;
+
+  /* ── Model preference (user-selected via composer dropdown) ─────── */
+  preferredModel: 'mistral' | 'gemini';
+  setPreferredModel: (model: 'mistral' | 'gemini') => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -52,6 +62,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  activeView: 'chat',
+  setActiveView: (view) => set({ activeView: view }),
 
   /* ── Conversations ────────────────────────── */
   conversations: [],
@@ -124,4 +136,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   /* ── Loading ──────────────────────────────── */
   setIsLoadingConversation: (v) => set({ isLoadingConversation: v }),
+
+  /* ── Model preference ────────────────────── */
+  // Default to Mistral once the backend migration lands; Gemini is the
+  // fallback / backup. The current backend ignores this field until the
+  // `/api/chat` route reads `body.model`.
+  preferredModel: 'mistral',
+  setPreferredModel: (model) => set({ preferredModel: model }),
 }));

@@ -23,7 +23,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans bg-dark-900 text-gray-300`}>
+      <body
+        suppressHydrationWarning
+        className={`${inter.variable} font-sans bg-dark-900 text-gray-300`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

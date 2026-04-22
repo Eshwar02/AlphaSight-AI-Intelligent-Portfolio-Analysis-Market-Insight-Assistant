@@ -25,6 +25,14 @@ const config: Config = {
           950: '#171719',
         },
         accent: {
+          // Brand accent — cool teal/cyan, used for UI chrome (send button,
+          // active sidebar item, focus rings, brand mark). Softer on the eyes
+          // than the old emerald and more in line with the Claude aesthetic.
+          brand: '#2dd4bf',
+          'brand-hover': '#5eead4',
+          'brand-muted': 'rgba(45, 212, 191, 0.12)',
+          'brand-ring': 'rgba(45, 212, 191, 0.35)',
+          // Green is reserved for price-up / positive stock movement.
           green: '#10b981',
           red: '#ef4444',
           blue: '#3b82f6',
@@ -36,9 +44,9 @@ const config: Config = {
           css: {
             '--tw-prose-body': '#d1d5db',
             '--tw-prose-headings': '#f3f4f6',
-            '--tw-prose-links': '#10b981',
+            '--tw-prose-links': '#2dd4bf',
             '--tw-prose-bold': '#f3f4f6',
-            '--tw-prose-code': '#10b981',
+            '--tw-prose-code': '#5eead4',
             '--tw-prose-pre-bg': '#171719',
             '--tw-prose-pre-code': '#d1d5db',
             '--tw-prose-quotes': '#9ca3af',

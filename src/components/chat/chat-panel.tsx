@@ -1,23 +1,37 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { useChat } from '@/lib/hooks/use-chat';
 import { ChatMessage } from './chat-message';
-import { ChatInput } from './chat-input';
 import { WelcomeScreen } from './welcome-screen';
+import { GradientAIChatInput, type ModelOption } from '@/components/ui/gradient-ai-chat-input';
 import { cn } from '@/lib/utils';
+
+const MODEL_OPTIONS: ModelOption[] = [
+  {
+    id: 'mistral',
+    label: 'Mistral',
+    value: 'mistral',
+    description: 'Primary — large free tier',
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    value: 'gemini',
+    description: 'Backup — Google AI Studio',
+  },
+];
 
 function LoadingSkeleton() {
   return (
-    <div className="mx-auto flex max-w-3xl animate-pulse flex-col gap-6 px-4 py-8">
+    <div className="mx-auto flex max-w-3xl animate-pulse flex-col gap-6 px-4 py-8 sm:px-6">
       {[1, 2, 3].map((i) => (
         <div key={i} className="flex gap-4">
-          <div className="h-7 w-7 shrink-0 rounded-full bg-dark-700" />
+          <div className="h-6 w-6 shrink-0 rounded bg-dark-800" />
           <div className="flex-1 space-y-2.5">
-            <div className="h-3 w-16 rounded bg-dark-700" />
-            <div className="h-3 w-full rounded bg-dark-700/70" />
-            <div className="h-3 w-3/4 rounded bg-dark-700/50" />
+            <div className="h-3 w-full rounded bg-dark-800/70" />
+            <div className="h-3 w-3/4 rounded bg-dark-800/50" />
           </div>
         </div>
       ))}
@@ -26,14 +40,22 @@ function LoadingSkeleton() {
 }
 
 export function ChatPanel() {
-  const { messages, isLoadingConversation, isStreaming } = useAppStore();
+  const { messages, isLoadingConversation, isStreaming, preferredModel, setPreferredModel } =
+    useAppStore();
   const { sendMessage, stopStreaming } = useChat();
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState('');
 
   const hasMessages = messages.length > 0;
 
-  // Auto-scroll to bottom when new messages appear
+  const selectedModel = useMemo(
+    () => MODEL_OPTIONS.find((m) => m.value === preferredModel) ?? MODEL_OPTIONS[0],
+    [preferredModel],
+  );
+
+  // Auto-scroll on new messages
   useEffect(() => {
     if (bottomRef.current && scrollRef.current) {
       const scrollContainer = scrollRef.current;
@@ -43,7 +65,7 @@ export function ChatPanel() {
     }
   }, [messages.length]);
 
-  // Also auto-scroll during streaming as content appends
+  // Auto-scroll during streaming
   const lastMessage = messages[messages.length - 1];
   const streamingContent = lastMessage?.isStreaming ? lastMessage.content.length : 0;
   useEffect(() => {
@@ -55,9 +77,15 @@ export function ChatPanel() {
     }
   }, [streamingContent]);
 
+  const handleSend = useCallback(() => {
+    const content = draft.trim();
+    if (!content || isStreaming) return;
+    sendMessage(content);
+    setDraft('');
+  }, [draft, isStreaming, sendMessage]);
+
   return (
     <div className="flex h-full flex-col bg-dark-900">
-      {/* Scrollable message area */}
       <div
         ref={scrollRef}
         className={cn(
@@ -68,7 +96,7 @@ export function ChatPanel() {
         {isLoadingConversation ? (
           <LoadingSkeleton />
         ) : hasMessages ? (
-          <div className="pb-4">
+          <div className="pb-6 pt-2">
             {messages.map((msg) => (
               <ChatMessage key={msg.id} message={msg} />
             ))}
@@ -79,12 +107,25 @@ export function ChatPanel() {
         )}
       </div>
 
-      {/* Sticky input at bottom */}
-      <ChatInput
-        onSend={sendMessage}
-        onStop={stopStreaming}
-        isStreaming={isStreaming}
-      />
+      {/* Composer */}
+      <div className="bg-dark-900 px-4 pb-5 pt-2 sm:px-6">
+        <div className="mx-auto max-w-3xl">
+          <GradientAIChatInput
+            value={draft}
+            onChange={setDraft}
+            onSend={handleSend}
+            onStop={stopStreaming}
+            isStreaming={isStreaming}
+            placeholder="Ask about any stock, market, or portfolio…"
+            modelOptions={MODEL_OPTIONS}
+            selectedModel={selectedModel}
+            onModelSelect={(opt) => setPreferredModel(opt.value as 'mistral' | 'gemini')}
+          />
+          <p className="mt-2 text-center text-[11px] text-dark-500">
+            AlphaSight can make mistakes. Verify critical financial decisions.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

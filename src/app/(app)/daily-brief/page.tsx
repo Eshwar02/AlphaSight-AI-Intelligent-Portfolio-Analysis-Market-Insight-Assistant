@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton, SkeletonCard, SkeletonLine } from '@/components/ui/skeleton';
 import type { DailyBrief, PortfolioSnapshot } from '@/types/stock';
 
-export default function DailyBriefPage() {
+export function DailyBriefView() {
   const [briefs, setBriefs] = useState<DailyBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -219,6 +219,10 @@ export default function DailyBriefPage() {
       </div>
     </div>
   );
+}
+
+export default function DailyBriefPage() {
+  return <DailyBriefView />;
 }
 
 /* ── Sub-components ──────────────────────────────────────────────── */

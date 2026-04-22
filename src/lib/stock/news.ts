@@ -137,18 +137,7 @@ export async function fetchStockNews(
     }
   }
 
-  // Fallback placeholder if nothing was found
-  if (newsItems.length === 0) {
-    return [
-      {
-        title: `No recent news found for ${companyName || symbol}`,
-        url: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}`,
-        source: "AlphaSight AI",
-        publishedAt: new Date().toISOString(),
-        summary: `We could not find recent news articles for ${companyName || symbol}. This may be a less-covered stock or the news endpoints are temporarily unavailable. Check Yahoo Finance directly for the latest updates.`,
-      },
-    ];
-  }
+  if (newsItems.length === 0) return [];
 
   // Deduplicate by title
   const seen = new Set<string>();

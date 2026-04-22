@@ -18,7 +18,7 @@ import { PortfolioSummary } from '@/components/portfolio/portfolio-summary';
 import { AddHoldingModal } from '@/components/portfolio/add-holding-modal';
 import type { PortfolioHolding } from '@/types/stock';
 
-export default function PortfolioPage() {
+export function PortfolioView() {
   const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -350,4 +350,8 @@ export default function PortfolioPage() {
       />
     </div>
   );
+}
+
+export default function PortfolioPage() {
+  return <PortfolioView />;
 }

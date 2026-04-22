@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -15,7 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppStore } from '@/stores/app-store';
+import { useAppStore, type AppView } from '@/stores/app-store';
 import type { Conversation } from '@/types/database';
 
 /* ── Date grouping helpers ───────────────────────────────────────── */
@@ -57,10 +56,10 @@ function groupConversations(conversations: Conversation[]) {
 /* ── Nav links ───────────────────────────────────────────────────── */
 
 const navLinks = [
-  { href: '/portfolio', label: 'Portfolio', icon: Briefcase },
-  { href: '/daily-brief', label: 'Daily Brief', icon: Sun },
-  { href: '/watchlist', label: 'Watchlist', icon: Star },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { view: 'portfolio', label: 'Portfolio', icon: Briefcase },
+  { view: 'brief', label: 'Daily Brief', icon: Sun },
+  { view: 'watchlist', label: 'Watchlist', icon: Star },
+  { view: 'settings', label: 'Settings', icon: Settings },
 ] as const;
 
 /* ── Sidebar overlay (mobile) ────────────────────────────────────── */
@@ -88,6 +87,8 @@ export function Sidebar() {
   const conversations = useAppStore((s) => s.conversations);
   const activeConversationId = useAppStore((s) => s.activeConversationId);
   const setActiveConversation = useAppStore((s) => s.setActiveConversation);
+  const activeView = useAppStore((s) => s.activeView);
+  const setActiveView = useAppStore((s) => s.setActiveView);
   const createNewChat = useAppStore((s) => s.createNewChat);
   const deleteConversation = useAppStore((s) => s.deleteConversation);
 
@@ -95,20 +96,23 @@ export function Sidebar() {
 
   const handleNewChat = useCallback(() => {
     createNewChat();
+    setActiveView('chat');
     if (pathname !== '/') {
       router.push('/');
     }
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     if (isMobile) toggleSidebar();
-  }, [createNewChat, pathname, router, toggleSidebar]);
+  }, [createNewChat, pathname, router, setActiveView, toggleSidebar]);
 
   const handleSelectChat = useCallback(
     (id: string) => {
       setActiveConversation(id);
+      setActiveView('chat');
+      router.push(`/chat/${id}`);
       const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
       if (isMobile) toggleSidebar();
     },
-    [setActiveConversation, toggleSidebar]
+    [router, setActiveConversation, setActiveView, toggleSidebar]
   );
 
   const handleDeleteConversation = useCallback(
@@ -126,43 +130,71 @@ export function Sidebar() {
     [deleteConversation]
   );
 
+  const handleViewSelect = useCallback(
+    (view: AppView) => {
+      setActiveView(view);
+      router.push('/');
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobile) toggleSidebar();
+    },
+    [router, setActiveView, toggleSidebar]
+  );
+
   const sidebarContent = (
     <div className="flex h-full flex-col bg-dark-950 text-sm">
-      {/* ── Top bar ──────────────────────────── */}
-      <div className="flex items-center justify-between p-3">
-        <button
-          onClick={handleNewChat}
-          className="flex flex-1 items-center gap-2 rounded-lg border border-dark-700 px-3 py-2.5 text-gray-200 transition-colors hover:bg-dark-850"
-        >
-          <Plus size={16} />
-          <span>New Chat</span>
-        </button>
+      {/* ── Brand row ────────────────────────── */}
+      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2 px-1">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            className="h-5 w-5 text-accent-brand"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 2.5 13.6 9.2 20.3 10.8 13.6 12.4 12 19.1 10.4 12.4 3.7 10.8 10.4 9.2 12 2.5Z"
+              fill="currentColor"
+            />
+          </svg>
+          <span className="text-[13px] font-semibold tracking-tight text-gray-100">
+            AlphaSight
+          </span>
+        </div>
         <button
           onClick={toggleSidebar}
-          className="ml-2 rounded-lg p-2 text-gray-400 transition-colors hover:bg-dark-850 hover:text-gray-200"
+          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-dark-900 hover:text-gray-200"
           aria-label="Close sidebar"
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={16} />
         </button>
       </div>
 
-      {/* ── Brand ────────────────────────────── */}
-      <div className="px-4 pb-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-accent-green">
-          AlphaSight AI
-        </span>
+      {/* ── New Chat button ──────────────────── */}
+      <div className="px-3 pb-3">
+        <button
+          onClick={handleNewChat}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-lg px-3 py-2',
+            'border border-dark-800 bg-dark-900/60 text-[13px] font-medium text-gray-200',
+            'transition-all duration-150',
+            'hover:border-accent-brand/40 hover:bg-dark-900 hover:text-gray-50',
+          )}
+        >
+          <Plus size={15} strokeWidth={2} />
+          <span>New chat</span>
+        </button>
       </div>
 
       {/* ── Chat history ─────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-2">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-dark-800">
         {grouped.length === 0 && (
           <p className="px-3 py-8 text-center text-xs text-dark-500">
             No conversations yet
           </p>
         )}
         {grouped.map((group) => (
-          <div key={group.label} className="mb-3">
-            <h3 className="mb-1 px-3 text-xs font-medium text-dark-500">
+          <div key={group.label} className="mb-4">
+            <h3 className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-dark-500">
               {group.label}
             </h3>
             {group.items.map((conv) => {
@@ -171,29 +203,34 @@ export function Sidebar() {
                 <div
                   key={conv.id}
                   className={cn(
-                    'group relative flex items-center rounded-lg px-3 py-2 cursor-pointer transition-colors',
+                    'group relative flex cursor-pointer items-center rounded-lg px-3 py-1.5',
+                    'transition-colors duration-100',
                     isActive
-                      ? 'bg-dark-800 text-gray-100'
-                      : 'text-gray-400 hover:bg-dark-850 hover:text-gray-200'
+                      ? 'bg-dark-850 text-gray-50'
+                      : 'text-gray-400 hover:bg-dark-900 hover:text-gray-200',
                   )}
                   onClick={() => handleSelectChat(conv.id)}
                 >
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-accent-brand" />
+                  )}
                   <MessageSquare
-                    size={14}
-                    className="mr-2.5 shrink-0 text-dark-500"
+                    size={13}
+                    className={cn(
+                      'mr-2.5 shrink-0',
+                      isActive ? 'text-accent-brand' : 'text-dark-500',
+                    )}
                   />
-                  <span className="flex-1 truncate text-[13px]">
-                    {conv.title}
-                  </span>
+                  <span className="flex-1 truncate text-[13px]">{conv.title}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       void handleDeleteConversation(conv.id);
                     }}
-                    className="ml-1 hidden shrink-0 rounded p-1 text-dark-500 transition-colors hover:text-red-400 group-hover:block"
+                    className="ml-1 hidden shrink-0 rounded p-1 text-dark-500 transition-colors hover:bg-dark-800 hover:text-red-400 group-hover:block"
                     aria-label="Delete conversation"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               );
@@ -203,23 +240,27 @@ export function Sidebar() {
       </div>
 
       {/* ── Bottom nav ───────────────────────── */}
-      <div className="border-t border-dark-800 p-2">
+      <div className="border-t border-dark-800/80 p-2">
         {navLinks.map((link) => {
-          const isActive = pathname === link.href;
+          const isActive = activeView === link.view;
           return (
-            <Link
-              key={link.href}
-              href={link.href}
+            <button
+              key={link.view}
+              onClick={() => handleViewSelect(link.view)}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors',
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px]',
+                'transition-colors duration-100',
                 isActive
-                  ? 'bg-dark-800 text-gray-100'
-                  : 'text-gray-400 hover:bg-dark-850 hover:text-gray-200'
+                  ? 'bg-dark-850 text-gray-50'
+                  : 'text-gray-400 hover:bg-dark-900 hover:text-gray-200',
               )}
             >
-              <link.icon size={16} />
+              <link.icon
+                size={15}
+                className={isActive ? 'text-accent-brand' : undefined}
+              />
               <span>{link.label}</span>
-            </Link>
+            </button>
           );
         })}
       </div>

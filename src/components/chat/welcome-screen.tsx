@@ -18,14 +18,14 @@ const suggestions = [
   },
   {
     icon: BarChart3,
-    label: 'Reliance Industries deep dive',
+    label: 'Reliance deep dive',
     prompt: 'Reliance Industries deep dive',
     description: 'Comprehensive analysis of RIL',
   },
   {
     icon: Globe,
-    label: 'US market outlook today',
-    prompt: "What's happening in US markets?",
+    label: 'US market outlook',
+    prompt: "What's happening in US markets today?",
     description: 'Indices, sectors & macro trends',
   },
   {
@@ -36,60 +36,104 @@ const suggestions = [
   },
 ];
 
+function SparkleMark() {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      className="h-10 w-10 text-accent-brand"
+      aria-hidden="true"
+    >
+      <path
+        d="M16 3.5 18.1 12 26.6 14.1 18.1 16.2 16 24.7 13.9 16.2 5.4 14.1 13.9 12 16 3.5Z"
+        fill="currentColor"
+        fillOpacity="0.95"
+      />
+      <path
+        d="M25 4 25.9 7.2 29 8.1 25.9 9 25 12.1 24.1 9 21 8.1 24.1 7.2 25 4Z"
+        fill="currentColor"
+        fillOpacity="0.55"
+      />
+    </svg>
+  );
+}
+
 export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-4 pb-20">
-      {/* Title */}
+    <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-16 sm:pb-16">
+      {/* Sparkle mark */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="mb-3 text-center"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="mb-5"
       >
-        <h1 className="bg-gradient-to-r from-gray-100 via-dark-300 to-gray-100 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
-          AlphaSight AI
-        </h1>
+        <SparkleMark />
       </motion.div>
 
-      <motion.p
-        initial={{ opacity: 0, y: 10 }}
+      {/* Title */}
+      <motion.h1
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="mb-10 text-center text-base text-dark-400 sm:text-lg"
+        transition={{ duration: 0.5, delay: 0.05 }}
+        className="mb-2 text-center text-3xl font-semibold tracking-tight text-gray-100 sm:text-4xl"
       >
-        Your AI-Powered Stock Intelligence Copilot
+        How can I help you today?
+      </motion.h1>
+
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.12 }}
+        className="mb-10 max-w-md text-center text-sm text-dark-400"
+      >
+        Institutional-grade stock research, on demand. Ask about any company, market, or portfolio.
       </motion.p>
 
       {/* Suggestion cards */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
-        className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2"
+        className="grid w-full max-w-2xl grid-cols-1 gap-2.5 sm:grid-cols-2"
       >
         {suggestions.map((s, i) => (
           <motion.button
             key={s.label}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.25 + i * 0.07 }}
+            transition={{ duration: 0.3, delay: 0.25 + i * 0.06 }}
             onClick={() => onSendPrompt(s.prompt)}
             className={cn(
-              'group flex items-start gap-3 rounded-xl border border-dark-700 bg-dark-800 p-4',
-              'text-left transition-all duration-200',
-              'hover:border-dark-600 hover:bg-dark-850',
+              'group relative flex items-start gap-3 overflow-hidden rounded-xl border p-4 text-left',
+              'border-dark-800 bg-dark-900/40 backdrop-blur-sm',
+              'transition-all duration-200',
+              'hover:border-accent-brand/40 hover:bg-dark-800/60',
             )}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-dark-900 text-dark-400 transition-colors group-hover:text-accent-green">
-              <s.icon className="h-[18px] w-[18px]" />
+            {/* subtle hover glow */}
+            <span
+              className={cn(
+                'pointer-events-none absolute inset-x-0 top-0 h-px',
+                'bg-gradient-to-r from-transparent via-accent-brand/40 to-transparent opacity-0',
+                'transition-opacity duration-300 group-hover:opacity-100',
+              )}
+            />
+
+            <div
+              className={cn(
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                'bg-dark-800 text-dark-400 transition-colors',
+                'group-hover:bg-accent-brand-muted group-hover:text-accent-brand',
+              )}
+            >
+              <s.icon className="h-[15px] w-[15px]" />
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-medium text-gray-200 group-hover:text-gray-100">
+              <div className="text-sm font-medium text-gray-200 transition-colors group-hover:text-gray-50">
                 {s.label}
               </div>
-              <div className="mt-0.5 text-xs text-dark-500">
-                {s.description}
-              </div>
+              <div className="mt-0.5 text-[12px] text-dark-500">{s.description}</div>
             </div>
           </motion.button>
         ))}

@@ -52,9 +52,6 @@ export function validateGeminiSetup(): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
-// Back-compat alias so existing callers keep working during the migration.
-export const validateGroqSetup = validateGeminiSetup;
-
 /**
  * Turn a raw Gemini/Google API error into a short, user-readable line that's
  * safe to append into the chat stream. Avoids dumping the full JSON payload.
@@ -133,10 +130,15 @@ function getGeminiClient(): GoogleGenAI {
 // Model selection. Gemini 2.0 Flash is the default for chat and stock analysis
 // (fast, high quality, generous free tier). 8b-equivalent fallback isn't
 // needed because Gemini's rate limits are different from Groq's.
-const STOCK_ANALYSIS_MODEL = "gemini-1.5-flash";
-const GENERAL_CHAT_MODEL = "gemini-1.5-flash";
-const CLASSIFIER_MODEL = "gemini-1.5-flash";
-const DAILY_BRIEF_MODEL = "gemini-1.5-flash";
+// Verified working with the configured API key. If you change keys and one of
+// these stops working, run `node scripts/test-gemini.mjs` to discover which
+// models your key can call.
+const STOCK_ANALYSIS_MODEL = "gemini-2.5-flash";
+const GENERAL_CHAT_MODEL = "gemini-2.5-flash";
+// Classifier is a tiny JSON-only call — use the cheaper lite variant to save
+// the 2.5-flash quota for the main chat response.
+const CLASSIFIER_MODEL = "gemini-2.5-flash-lite";
+const DAILY_BRIEF_MODEL = "gemini-2.5-flash";
 
 /**
  * Classify user intent using the LLM. Used as a fallback when regex

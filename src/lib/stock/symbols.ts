@@ -401,22 +401,20 @@ export async function resolveSymbol(query: string): Promise<string | null> {
           !!q && typeof q === "object" && "symbol" in q && !!q.symbol
       );
 
-      const preferred =
-        quotes.find((q) => {
-          const quoteType = String(q.quoteType || "").toUpperCase();
-          const symbol = String(q.symbol || "").toUpperCase();
-          if (isCrypto) {
+      const preferred = isCrypto
+        ? quotes.find((q) => {
+            const quoteType = String(q.quoteType || "").toUpperCase();
+            const symbol = String(q.symbol || "").toUpperCase();
             return quoteType === "CRYPTOCURRENCY" || symbol.includes("-USD");
-          }
-          return quoteType === "EQUITY" || quoteType === "ETF";
-        }) ||
-        quotes.find((q) => {
-          if (isCrypto) return false;
-          const quoteType = String(q.quoteType || "").toUpperCase();
-          const symbol = String(q.symbol || "").toUpperCase();
-          return quoteType !== "CRYPTOCURRENCY" && !symbol.includes("-USD");
-        }) ||
-        quotes[0];
+          })
+        : quotes.find((q) => {
+            const quoteType = String(q.quoteType || "").toUpperCase();
+            const symbol = String(q.symbol || "").toUpperCase();
+            return (
+              (quoteType === "EQUITY" || quoteType === "ETF") &&
+              !symbol.includes("-USD")
+            );
+          });
 
       if (preferred?.symbol) {
         return String(preferred.symbol);
@@ -426,8 +424,8 @@ export async function resolveSymbol(query: string): Promise<string | null> {
     // Search failed, continue to fallback
   }
 
-  // 6. If it looks like a ticker, return it as-is
-  if (upper.length <= 12 && /^[A-Z0-9&\-.]+$/.test(upper)) {
+  // 6. If it looks like a standalone ticker, return it as-is
+  if (!/\s/.test(trimmed) && upper.length <= 8 && /^[A-Z0-9&\-.]+$/.test(upper)) {
     return forceIndian ? `${upper}.NS` : upper;
   }
 

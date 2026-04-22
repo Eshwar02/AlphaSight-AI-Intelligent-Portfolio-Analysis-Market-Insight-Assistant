@@ -26,7 +26,7 @@ interface WatchlistStock {
   changePercent?: number;
 }
 
-export default function WatchlistPage() {
+export function WatchlistView() {
   const [items, setItems] = useState<WatchlistStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [newSymbol, setNewSymbol] = useState('');
@@ -236,4 +236,8 @@ export default function WatchlistPage() {
       </div>
     </div>
   );
+}
+
+export default function WatchlistPage() {
+  return <WatchlistView />;
 }
