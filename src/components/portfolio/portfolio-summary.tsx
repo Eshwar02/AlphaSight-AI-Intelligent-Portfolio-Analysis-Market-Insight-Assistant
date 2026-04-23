@@ -16,6 +16,7 @@ function PortfolioSummary({ holdings }: PortfolioSummaryProps) {
   );
   const totalPnl = totalValue - totalCost;
   const totalPnlPercent = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
+  const primaryCurrency = holdings.length > 0 ? (holdings[0].currency || "USD") : 'USD';
 
   const best = holdings.length
     ? holdings.reduce((a, b) => (a.pnlPercent > b.pnlPercent ? a : b))
@@ -27,14 +28,14 @@ function PortfolioSummary({ holdings }: PortfolioSummaryProps) {
   const cards = [
     {
       label: 'Total Value',
-      value: formatCurrency(totalValue),
+      value: formatCurrency(totalValue, primaryCurrency),
       icon: DollarSign,
       color: 'text-accent-green',
       bgColor: 'bg-accent-green/10',
     },
     {
       label: 'Total P&L',
-      value: `${formatCurrency(Math.abs(totalPnl))} (${formatPercent(totalPnlPercent)})`,
+      value: `${formatCurrency(Math.abs(totalPnl), primaryCurrency)} (${formatPercent(totalPnlPercent)})`,
       icon: totalPnl >= 0 ? TrendingUp : TrendingDown,
       color: totalPnl >= 0 ? 'text-accent-green' : 'text-accent-red',
       bgColor:
@@ -98,3 +99,4 @@ function PortfolioSummary({ holdings }: PortfolioSummaryProps) {
 }
 
 export { PortfolioSummary };
+

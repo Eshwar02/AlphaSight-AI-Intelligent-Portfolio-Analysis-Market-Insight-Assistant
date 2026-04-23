@@ -58,6 +58,7 @@ export async function GET() {
 
           return {
             ...holding,
+            name: quote.name,
             currentPrice,
             currentValue,
             pnl,
@@ -67,6 +68,7 @@ export async function GET() {
           // If quote fails, return with zero current data
           return {
             ...holding,
+            name: holding.symbol,
             currentPrice: 0,
             currentValue: 0,
             pnl: 0,

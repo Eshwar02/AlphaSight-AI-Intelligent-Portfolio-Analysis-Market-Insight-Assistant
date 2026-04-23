@@ -91,7 +91,7 @@ export function PortfolioView() {
             </h1>
             {!loading && holdings.length > 0 && (
               <p className="text-sm text-dark-400 mt-1">
-                {formatCurrency(totalValue)} total value{' '}
+                {holdings.length > 0 ? formatCurrency(totalValue, (holdings[0].currency || "USD")) : formatCurrency(totalValue)} total value{' '}
                 <span className={cn(getChangeColor(totalPnl))}>
                   ({formatPercent(
                     totalCost > 0 ? (totalPnl / totalCost) * 100 : 0
@@ -185,24 +185,18 @@ export function PortfolioView() {
                         exit={{ opacity: 0, x: -20 }}
                         className="border-b border-dark-700/50 hover:bg-dark-850 transition-colors"
                       >
-                        <td className="px-4 py-3">
-                          <div>
-                            <span className="font-semibold text-gray-100">
-                              {h.symbol}
-                            </span>
-                          </div>
-                        </td>
+                        <td className="px-4 py-3"><div><p className="font-semibold text-gray-100">{h.name || h.symbol}</p><p className="text-xs text-dark-400">{h.symbol}</p></div></td>
                         <td className="px-4 py-3 text-right text-gray-300">
                           {h.quantity}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-300">
-                          {formatCurrency(h.avg_buy_price)}
+                          {formatCurrency(h.avg_buy_price, (h.currency || "USD"))}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-100 font-medium">
-                          {formatCurrency(h.currentPrice)}
+                          {formatCurrency(h.currentPrice, (h.currency || "USD"))}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-100 font-medium">
-                          {formatCurrency(h.currentValue)}
+                          {formatCurrency(h.currentValue, (h.currency || "USD"))}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex flex-col items-end">
@@ -212,7 +206,7 @@ export function PortfolioView() {
                                 getChangeColor(h.pnl)
                               )}
                             >
-                              {formatCurrency(h.pnl)}
+                              {formatCurrency(h.pnl, (h.currency || "USD"))}
                             </span>
                             <Badge
                               variant={
@@ -273,7 +267,7 @@ export function PortfolioView() {
                           {h.symbol}
                         </span>
                         <p className="text-xs text-dark-400 mt-0.5">
-                          {h.quantity} shares @ {formatCurrency(h.avg_buy_price)}
+                          {h.quantity} shares @ {formatCurrency(h.avg_buy_price, (h.currency || "USD"))}
                         </p>
                       </div>
                       <Badge
@@ -292,13 +286,13 @@ export function PortfolioView() {
                       <div>
                         <p className="text-xs text-dark-400">Current Price</p>
                         <p className="text-gray-100 font-medium">
-                          {formatCurrency(h.currentPrice)}
+                          {formatCurrency(h.currentPrice, (h.currency || "USD"))}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-dark-400">Current Value</p>
                         <p className="text-gray-100 font-medium">
-                          {formatCurrency(h.currentValue)}
+                          {formatCurrency(h.currentValue, (h.currency || "USD"))}
                         </p>
                       </div>
                       <div>
@@ -309,7 +303,7 @@ export function PortfolioView() {
                             getChangeColor(h.pnl)
                           )}
                         >
-                          {formatCurrency(h.pnl)}
+                          {formatCurrency(h.pnl, (h.currency || "USD"))}
                         </p>
                       </div>
                     </div>
@@ -355,3 +349,9 @@ export function PortfolioView() {
 export default function PortfolioPage() {
   return <PortfolioView />;
 }
+
+
+
+
+
+

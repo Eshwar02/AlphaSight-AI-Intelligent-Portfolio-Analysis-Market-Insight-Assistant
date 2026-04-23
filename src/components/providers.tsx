@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAppStore } from '@/stores/app-store';
+import { ThemeProvider } from '@/components/theme-provider';
 import type { ChatMessage } from '@/stores/app-store';
 import type { Json } from '@/types/database';
 
@@ -207,5 +208,5 @@ export function Providers({ children }: ProvidersProps) {
     loadMessages();
   }, [activeConversationId, setMessages, setIsLoadingConversation]);
 
-  return <>{children}</>;
+  return <ThemeProvider><>{children}</></ThemeProvider>;
 }

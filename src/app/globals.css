@@ -11,7 +11,12 @@
     @apply bg-dark-900 text-gray-300 antialiased;
   }
 
-  /* Custom scrollbar */
+  /* Light theme */
+  body.light {
+    @apply bg-white text-gray-900;
+  }
+
+  /* Custom scrollbar - dark */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -29,10 +34,23 @@
     @apply bg-dark-600;
   }
 
+  /* Light theme scrollbar */
+  body.light ::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+  }
+
+  body.light ::-webkit-scrollbar-thumb:hover {
+    background: #d1d5db;
+  }
+
   /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
     scrollbar-color: #4a4a5a transparent;
+  }
+
+  body.light {
+    scrollbar-color: #e5e7eb transparent;
   }
 }
 
@@ -42,8 +60,16 @@
     @apply rounded-lg border border-dark-700 bg-dark-950;
   }
 
+  body.light .prose pre {
+    @apply border-gray-300 bg-gray-50;
+  }
+
   .prose code:not(pre code) {
     @apply rounded bg-dark-950 px-1.5 py-0.5 text-accent-green;
+  }
+
+  body.light .prose code:not(pre code) {
+    @apply bg-gray-100 text-accent-green;
   }
 
   .prose a {
@@ -58,12 +84,24 @@
     @apply border-b border-dark-700 px-3 py-2 text-left text-sm font-semibold text-gray-100;
   }
 
+  body.light .prose th {
+    @apply border-b border-gray-300 text-gray-900;
+  }
+
   .prose td {
     @apply border-b border-dark-700/50 px-3 py-2 text-sm;
   }
 
+  body.light .prose td {
+    @apply border-b border-gray-300/50;
+  }
+
   .prose blockquote {
     @apply border-l-2 border-dark-600 italic text-dark-400;
+  }
+
+  body.light .prose blockquote {
+    @apply border-l-2 border-gray-300 text-gray-600;
   }
 
   /* Chat message animation */

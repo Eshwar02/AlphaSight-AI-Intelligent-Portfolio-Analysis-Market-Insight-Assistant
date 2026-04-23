@@ -86,6 +86,7 @@ export interface StockAnalysis {
 // ── Portfolio types (DB row + computed fields) ───────────────────────
 
 export interface PortfolioHolding extends PortfolioHoldingRow {
+  name?: string;
   currentPrice: number;
   currentValue: number;
   pnl: number;
