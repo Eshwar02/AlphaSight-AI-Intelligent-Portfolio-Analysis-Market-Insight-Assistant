@@ -13,7 +13,11 @@ export const metadata: Metadata = {
   title: 'AlphaSight AI',
   description:
     'AI-powered stock analysis assistant. Get real-time insights, portfolio tracking, and market intelligence.',
-  icons: { icon: '/favicon.ico' },
+  icons: {
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
+    apple: '/logo.svg',
+  },
 };
 
 export default function RootLayout({

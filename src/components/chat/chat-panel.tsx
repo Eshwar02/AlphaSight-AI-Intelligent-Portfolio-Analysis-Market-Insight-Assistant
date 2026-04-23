@@ -85,11 +85,11 @@ export function ChatPanel() {
   }, [draft, isStreaming, sendMessage]);
 
   return (
-    <div className="flex h-full flex-col bg-dark-900">
+    <div className="flex h-full min-h-0 flex-col bg-dark-900">
       <div
         ref={scrollRef}
         className={cn(
-          'flex-1 overflow-y-auto',
+          'min-h-0 flex-1 overflow-y-auto',
           'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-dark-700',
         )}
       >

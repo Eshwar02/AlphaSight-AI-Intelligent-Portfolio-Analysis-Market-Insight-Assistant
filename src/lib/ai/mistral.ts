@@ -71,15 +71,20 @@ export function friendlyMistralError(err: unknown): string {
   return `Mistral error: ${short}`;
 }
 
+const HISTORY_MSG_CHAR_CAP = 320;
+
 function buildMessages(
   systemPrompt: string,
   latestPrompt: string,
   history: Array<{ role: ChatRole; content: string }>
 ): MistralMessage[] {
-  const trimmedHistory = history.slice(-10).map((m) => ({
-    role: m.role,
-    content: m.content,
-  })) as MistralMessage[];
+  const trimmedHistory = history.slice(-4).map((m) => {
+    const content =
+      m.content.length > HISTORY_MSG_CHAR_CAP
+        ? m.content.slice(0, HISTORY_MSG_CHAR_CAP) + " …[truncated]"
+        : m.content;
+    return { role: m.role, content };
+  }) as MistralMessage[];
 
   return [
     { role: "system", content: systemPrompt },
@@ -150,7 +155,34 @@ function parseNonStreamingText(data: unknown): string {
   if (!data || typeof data !== "object") return "";
   const choices = (data as { choices?: Array<{ message?: { content?: unknown } }> }).choices;
   const content = choices?.[0]?.message?.content;
-  return typeof content === "string" ? content : "";
+  if (typeof content === "string") return content;
+  return parseMistralDeltaText(content);
+}
+
+function parseMistralDeltaText(delta: unknown): string {
+  if (typeof delta === "string") return delta;
+
+  // Some responses may emit content as structured chunks:
+  // [{ type: "text", text: "..." }, ...]
+  if (Array.isArray(delta)) {
+    return delta
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          const text = (part as { text?: unknown }).text;
+          return typeof text === "string" ? text : "";
+        }
+        return "";
+      })
+      .join("");
+  }
+
+  if (delta && typeof delta === "object") {
+    const text = (delta as { text?: unknown }).text;
+    if (typeof text === "string") return text;
+  }
+
+  return "";
 }
 
 async function openStreamingResponse(response: Response): Promise<ReadableStream<Uint8Array>> {
@@ -187,8 +219,9 @@ async function openStreamingResponse(response: Response): Promise<ReadableStream
                   choices?: Array<{ delta?: { content?: unknown } }>;
                 };
                 const delta = parsed.choices?.[0]?.delta?.content;
-                if (typeof delta === "string" && delta.length > 0) {
-                  controller.enqueue(encoder.encode(delta));
+                const text = parseMistralDeltaText(delta);
+                if (text.length > 0) {
+                  controller.enqueue(encoder.encode(text));
                 }
               } catch {
                 // Keep stream alive on malformed keepalive chunks.
@@ -211,8 +244,9 @@ async function openStreamingResponse(response: Response): Promise<ReadableStream
                 choices?: Array<{ delta?: { content?: unknown } }>;
               };
               const delta = parsed.choices?.[0]?.delta?.content;
-              if (typeof delta === "string" && delta.length > 0) {
-                controller.enqueue(encoder.encode(delta));
+              const text = parseMistralDeltaText(delta);
+              if (text.length > 0) {
+                controller.enqueue(encoder.encode(text));
               }
             } catch {
               // ignore malformed trailing payload
@@ -320,7 +354,7 @@ export async function generateResponse(
     model: context.model ?? GENERAL_CHAT_MODEL,
     messages: buildMessages(context.systemPrompt, prompt, context.history ?? []),
     temperature: context.temperature ?? 0.6,
-    max_tokens: context.maxTokens ?? 2048,
+    max_tokens: context.maxTokens ?? 900,
     stream: Boolean(context.stream),
   };
 
@@ -346,7 +380,7 @@ export async function streamStockAnalysis(
     model: STOCK_ANALYSIS_MODEL,
     stream: true,
     temperature: 0.6,
-    maxTokens: 4096,
+    maxTokens: 1500,
     timeoutMs: 45_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;
@@ -363,7 +397,7 @@ export async function streamGeneralChat(
     model: GENERAL_CHAT_MODEL,
     stream: true,
     temperature: kind === "brief" ? 0.8 : 0.6,
-    maxTokens: kind === "brief" ? 256 : 3072,
+    maxTokens: kind === "brief" ? 140 : 800,
     timeoutMs: 45_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;
@@ -376,7 +410,7 @@ export async function generateDailyBrief(prompt: string): Promise<string> {
       model: DAILY_BRIEF_MODEL,
       stream: false,
       temperature: 0.6,
-      maxTokens: 2048,
+      maxTokens: 700,
       timeoutMs: 35_000,
     });
     return typeof result === "string" ? result : "";

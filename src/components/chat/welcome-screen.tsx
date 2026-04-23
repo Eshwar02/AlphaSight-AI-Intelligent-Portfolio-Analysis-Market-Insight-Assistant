@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import { TrendingUp, BarChart3, Globe, ArrowLeftRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,39 +37,17 @@ const suggestions = [
   },
 ];
 
-function SparkleMark() {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      fill="none"
-      className="h-10 w-10 text-accent-brand"
-      aria-hidden="true"
-    >
-      <path
-        d="M16 3.5 18.1 12 26.6 14.1 18.1 16.2 16 24.7 13.9 16.2 5.4 14.1 13.9 12 16 3.5Z"
-        fill="currentColor"
-        fillOpacity="0.95"
-      />
-      <path
-        d="M25 4 25.9 7.2 29 8.1 25.9 9 25 12.1 24.1 9 21 8.1 24.1 7.2 25 4Z"
-        fill="currentColor"
-        fillOpacity="0.55"
-      />
-    </svg>
-  );
-}
-
 export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-16 sm:pb-16">
-      {/* Sparkle mark */}
+      {/* Brand mark */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
         className="mb-5"
       >
-        <SparkleMark />
+        <Image src="/logo.svg" alt="AlphaSight" width={40} height={40} />
       </motion.div>
 
       {/* Title */}

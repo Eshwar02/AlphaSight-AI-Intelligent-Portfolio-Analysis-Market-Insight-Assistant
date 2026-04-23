@@ -2,11 +2,8 @@
 
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { MarkdownRenderer } from './markdown-renderer';
-import { MarkdownErrorBoundary } from './markdown-error-boundary';
-import { StockCard } from './stock-card';
-import { ChartWidget } from './chart-widget';
 import type { ChatMessage as ChatMessageType } from '@/stores/app-store';
 
 interface ChatMessageProps {
@@ -23,24 +20,8 @@ const EMPTY_RESPONSE_FALLBACK =
  */
 function AssistantMark() {
   return (
-    <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        className="h-[18px] w-[18px] text-accent-brand"
-        aria-hidden="true"
-      >
-        <path
-          d="M12 2.5 13.6 9.2 20.3 10.8 13.6 12.4 12 19.1 10.4 12.4 3.7 10.8 10.4 9.2 12 2.5Z"
-          fill="currentColor"
-          fillOpacity="0.9"
-        />
-        <path
-          d="M18.5 3.2 19.1 5.5 21.4 6.1 19.1 6.7 18.5 9 17.9 6.7 15.6 6.1 17.9 5.5 18.5 3.2Z"
-          fill="currentColor"
-          fillOpacity="0.6"
-        />
-      </svg>
+    <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md">
+      <Image src="/logo.svg" alt="AlphaSight" width={18} height={18} />
     </div>
   );
 }
@@ -78,6 +59,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
     [normalizedContent],
   );
   const hasContent = visibleText.length > 0;
+  const hasStreamingText = normalizedContent.trim().length > 0;
 
   if (process.env.NODE_ENV !== 'production' && !isUser) {
     console.debug('[ChatMessage] render', {
@@ -88,18 +70,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
       rawPreview: message.content.slice(0, 80),
     });
   }
-
-  const stockData = useMemo(() => {
-    if (!message.stockData) return null;
-    return message.stockData;
-  }, [message.stockData]);
-  const newsData = useMemo(() => {
-    if (!message.newsData || message.newsData.length === 0) return null;
-    return message.newsData;
-  }, [message.newsData]);
-  const primarySymbol = stockData?.[0]?.symbol;
-
-  const showEnhancements = hasContent;
 
   return (
     <motion.div
@@ -132,67 +102,23 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <AssistantMark />
           <div className="min-w-0 flex-1">
             {/* Body */}
-            {hasContent && (
-              <div className="text-[15px] leading-7 text-gray-200">
-                <MarkdownErrorBoundary content={normalizedContent}>
-                  <MarkdownRenderer
-                    content={normalizedContent}
-                    streaming={isStreaming}
-                  />
-                </MarkdownErrorBoundary>
+            {isStreaming && hasStreamingText && (
+              <div className="whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-200">
+                {normalizedContent}
               </div>
             )}
-            {!hasContent && isStreaming && <StreamingDots />}
+            {!isStreaming && hasContent && (
+              <div className="whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-200">
+                {normalizedContent}
+              </div>
+            )}
+            {!hasStreamingText && isStreaming && <StreamingDots />}
             {!hasContent && !isStreaming && (
               <div className="text-[15px] leading-7 text-gray-400 italic">
                 {EMPTY_RESPONSE_FALLBACK}
               </div>
             )}
 
-            {/* Stock card and chart are optional enhancements after text */}
-            {showEnhancements && stockData && stockData.length > 0 && (
-              <div className="mt-4">
-                {stockData.map((stock) =>
-                  typeof stock.price === 'number' ? (
-                    <StockCard key={stock.symbol} stock={stock} />
-                  ) : null,
-                )}
-              </div>
-            )}
-
-            {showEnhancements && primarySymbol && (
-              <div className="mt-4 overflow-hidden rounded-xl border border-dark-700/60">
-                <ChartWidget
-                  symbol={primarySymbol}
-                  exchange={stockData?.[0]?.exchange}
-                  height={320}
-                />
-              </div>
-            )}
-
-            {showEnhancements && newsData && (
-              <div className="mt-4 space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-dark-400">
-                  Related News
-                </h4>
-                <div className="space-y-2">
-                  {newsData.slice(0, 5).map((item) => (
-                    <a
-                      key={`${item.url}-${item.publishedAt}`}
-                      href={item.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block rounded-lg border border-dark-700/60 bg-dark-900/30 px-3 py-2 transition-colors hover:border-dark-600"
-                    >
-                      <p className="text-sm text-gray-200">{item.title}</p>
-                      <p className="mt-1 text-xs text-dark-400">
-                        {item.source} · {new Date(item.publishedAt).toLocaleDateString()}
-                      </p>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

@@ -130,6 +130,27 @@ function buildStockMetadata(stockAnalysis: StockAnalysis | null): Record<string,
   };
 }
 
+function compactStockAnalysis(input: StockAnalysis): StockAnalysis {
+  const compactCompanyInfo = input.companyInfo
+    ? {
+        ...input.companyInfo,
+        description: input.companyInfo.description
+          ? input.companyInfo.description.slice(0, 400)
+          : "",
+      }
+    : undefined;
+
+  return {
+    ...input,
+    // Keep roughly one trading year to reduce context size and token usage.
+    history: input.history.slice(-260),
+    news: input.news.slice(0, 4),
+    macroRisks: input.macroRisks.slice(0, 4),
+    rawMaterialRisks: input.rawMaterialRisks.slice(0, 4),
+    companyInfo: compactCompanyInfo,
+  };
+}
+
 function hasVisibleText(value: string): boolean {
   return value
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
@@ -169,9 +190,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const body = (await request.json()) as { message?: string; conversationId?: string };
+    const body = (await request.json()) as {
+      message?: string;
+      conversationId?: string;
+      model?: "mistral" | "gemini";
+    };
     const incomingMessage = body.message?.trim() ?? "";
     const requestedConversationId = body.conversationId ?? null;
+    const requestedModel: "mistral" | "gemini" =
+      body.model === "gemini" ? "gemini" : "mistral";
 
     if (!incomingMessage) {
       return chatJsonResponse("Please enter a message.", 400, {
@@ -247,7 +274,7 @@ export async function POST(request: NextRequest) {
       .select("role, content")
       .eq("conversation_id", activeConversationId)
       .order("created_at", { ascending: true })
-      .limit(20);
+      .limit(10);
 
     const conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = (
       historyRows || []
@@ -268,10 +295,20 @@ export async function POST(request: NextRequest) {
     let stockQuery: string | null = detectStockQuery(incomingMessage);
     console.debug("[chat-api] regex detection", { stockQuery: stockQuery ?? null });
 
+    // Skip classifier for short lowercase general questions — saves quota.
+    const looksLikeGeneral =
+      incomingMessage.length < 60 &&
+      !/[A-Z]{2,}/.test(incomingMessage) &&
+      !/\b(stock|share|ticker|price|quote|analyze|analysis|chart|buy|sell)\b/i.test(
+        incomingMessage
+      );
+
     if (!stockQuery) {
       if (isGreeting(incomingMessage)) {
         generalKind = "brief";
         console.debug("[chat-api] greeting shortcut");
+      } else if (looksLikeGeneral) {
+        console.debug("[chat-api] general shortcut (skip classifier)");
       } else {
         try {
           const intent = await withTimeout(
@@ -314,7 +351,7 @@ export async function POST(request: NextRequest) {
           if (!quote) throw new Error("Quote not found");
 
           const [historyResult, companyInfoResult, newsResult] = await Promise.allSettled([
-            withTimeout(fetchHistory(resolvedSymbol), 12000, "fetchHistory"),
+            withTimeout(fetchHistory(resolvedSymbol, 3), 12000, "fetchHistory"),
             withTimeout(fetchCompanyInfo(resolvedSymbol), 9000, "fetchCompanyInfo"),
             withTimeout(fetchStockNews(resolvedSymbol), 9000, "fetchStockNews"),
           ]);
@@ -333,7 +370,7 @@ export async function POST(request: NextRequest) {
                 };
           const news = newsResult.status === "fulfilled" ? newsResult.value : [];
 
-          stockAnalysis = {
+          stockAnalysis = compactStockAnalysis({
             quote,
             history,
             technicals: analyzeTechnicals(history, quote.price),
@@ -341,7 +378,7 @@ export async function POST(request: NextRequest) {
             macroRisks: assessMacroRisks(resolvedSymbol, companyInfo.sector, companyInfo.country),
             rawMaterialRisks: assessRawMaterialRisks(resolvedSymbol, companyInfo.sector),
             companyInfo,
-          };
+          });
           chatMode = "stock";
           console.debug("[chat-api] stock analysis ready", {
             symbol: resolvedSymbol,
@@ -367,8 +404,9 @@ export async function POST(request: NextRequest) {
           history: conversationHistory,
           analysis: stockAnalysis ?? undefined,
           kind: generalKind,
+          model: requestedModel,
         }),
-        25_000,
+        45_000,
         "streamChat"
       );
     } catch (llmError) {

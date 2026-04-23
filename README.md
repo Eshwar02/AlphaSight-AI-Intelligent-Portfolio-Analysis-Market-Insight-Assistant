@@ -1,152 +1,137 @@
-# 🚀 AlphaSight AI
+# AlphaSight AI
 
-### Intelligent Portfolio Analysis & Market Insight Assistant
+<p align="center">
+  <img src="./logos/final_logo.svg" alt="AlphaSight Logo" width="120" />
+</p>
 
-AlphaSight AI is a professional, AI-first stock intelligence platform for investors who want **real-time insights**, **portfolio clarity**, and **actionable daily market context** in one sleek workspace.
+<p align="center">
+  AI-first stock intelligence workspace with streaming chat, portfolio tracking, watchlist monitoring, and daily market briefs.
+</p>
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs)
-![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&logoColor=white)
-![Groq](https://img.shields.io/badge/AI-Groq-FF6B35)
-![Vercel](https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel)
-
----
-
-## ✨ Core Features
-
-### 💬 AI Chat Intelligence
-- Streaming AI responses for natural, low-latency interactions
-- Stock-aware context injection (quote, technicals, macro risks, news)
-- Persistent conversation history with secure user scoping
-
-### 📊 Portfolio Analytics
-- Add, edit, and manage holdings
-- Live valuation, P&L, and performance breakdowns
-- Clean summaries for top gainers/losers and portfolio health
-
-### 👀 Watchlist Tracking
-- Rapid symbol add/remove workflow
-- Real-time quote updates and movement tracking
-
-### ☀️ Daily Market Briefing
-- AI-generated daily portfolio brief
-- Market pulse + holdings snapshot + action-oriented highlights
-- Scheduled generation support via Vercel cron
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs" alt="Next.js 15" />
+  <img src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/AI-Mistral-F97316" alt="Mistral" />
+  <img src="https://img.shields.io/badge/AI-Google%20Gemini-4285F4" alt="Google Gemini" />
+</p>
 
 ---
 
-## 🧰 Tools & Technologies
+## What AlphaSight Does
 
-| Category | Stack |
+- Streams AI answers in chat for low-latency UX.
+- Supports stock-aware analysis using live quote/history/news context.
+- Tracks portfolio holdings with valuation and P&L summaries.
+- Manages watchlist symbols with real-time movement checks.
+- Generates daily brief summaries for portfolio + market pulse.
+- Uses **Contextual AI Synthesis** response style (summary + signals + risks + takeaway).
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
 |---|---|
-| **Frontend** | Next.js App Router, React 19, TypeScript, Tailwind CSS, Framer Motion |
-| **State Management** | Zustand |
-| **Backend APIs** | Next.js Route Handlers |
-| **Database & Auth** | Supabase (PostgreSQL + RLS + OAuth) |
-| **AI Layer** | Groq SDK (`llama-3.3-70b-versatile`) |
-| **Market Data** | Yahoo Finance chart/search HTTP endpoints (SDK-independent) |
-| **News Sources** | MarketAux, NewsData.io |
-| **Deployment** | Vercel |
+| Frontend | Next.js App Router, React 19, TypeScript, Tailwind CSS, Framer Motion |
+| State | Zustand |
+| Backend | Next.js Route Handlers |
+| Auth + DB | Supabase (Postgres + RLS) |
+| LLM Providers | Mistral (primary), Google Gemini (backup/selectable) |
+| Market Data | Yahoo Finance endpoints |
+| News | MarketAux, NewsData.io, Yahoo fallback |
 
 ---
 
-## 🧠 System Design (High-Level)
+## Architecture
 
 ```text
-Client UI (Next.js + Zustand)
-   ├─ Chat Panel
-   ├─ Portfolio Dashboard
-   ├─ Watchlist
-   └─ Daily Brief
+Client (Next.js + Zustand)
+  ├─ Chat UI
+  ├─ Portfolio UI
+  ├─ Watchlist UI
+  └─ Daily Brief UI
 
-API Layer (Route Handlers)
-   ├─ /api/chat
-   ├─ /api/portfolio
-   ├─ /api/watchlist
-   ├─ /api/daily-brief
-   └─ /api/conversations/*
+API (Route Handlers)
+  ├─ /api/chat
+  ├─ /api/conversations/*
+  ├─ /api/portfolio*
+  ├─ /api/watchlist
+  ├─ /api/stock/*
+  └─ /api/daily-brief
 
 Services
-   ├─ Groq (LLM responses)
-   ├─ Yahoo Finance (quotes/history/search)
-   └─ News APIs (MarketAux + NewsData)
+  ├─ Mistral / Gemini
+  ├─ Yahoo market endpoints
+  └─ News providers
 
 Persistence
-   └─ Supabase Postgres (RLS enabled)
+  └─ Supabase Postgres (RLS enforced)
 ```
 
 ---
 
-## 🗂️ Product Surfaces
+## Project Structure
 
-| Route | Purpose |
-|---|---|
-| `/` | AI chat assistant for stock and market analysis |
-| `/portfolio` | Portfolio holdings, valuation, and P&L views |
-| `/watchlist` | Watch symbols and monitor movement |
-| `/daily-brief` | Generate/read daily AI portfolio briefs |
-| `/login`, `/signup` | Authentication |
+```text
+src/
+  app/
+    (app)/                 # authenticated surfaces
+    api/                   # route handlers
+    auth/callback/         # OAuth callback
+    login/, signup/        # auth pages
+  components/              # chat, layout, portfolio, ui
+  lib/                     # ai, stock, supabase, hooks, utils
+  stores/                  # Zustand store
+  types/                   # shared TS types
+supabase/
+  schema.sql
+logos/
+  final_logo.svg
+```
 
 ---
 
-## 🛡️ Security & Data Isolation
+## Quick Start
 
-- Supabase Auth (email/password + Google OAuth)
-- Row-Level Security on all user-owned tables
-- Middleware-based session refresh and route protection
-- Service-role operations isolated to trusted server contexts
-
----
-
-## 🗄️ Database
-
-Schema file:
+### 1) Install
 
 ```bash
-supabase/schema.sql
+npm install
 ```
 
-Primary tables:
-
-- `conversations`
-- `messages`
-- `portfolio_holdings`
-- `watchlist`
-- `daily_briefs`
-- `user_preferences`
-
-Includes enums, indexes, triggers, and RLS policies.
-
----
-
-## ⚙️ Environment Setup
-
-Create `.env.local` in project root:
+### 2) Configure `.env.local`
 
 ```env
+# Supabase (required)
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-GROQ_API_KEY=
+# AI providers (at least one required; both recommended)
+MISTRAL_API_KEY=
+GOOGLE_API_KEY=
+# Optional alias accepted by code:
+# GEMINI_API_KEY=
+
+# News providers (optional but recommended)
 MARKETAUX_API_KEY=
 NEWSDATA_API_KEY=
+
+# Optional cron auth secret
 CRON_SECRET=
 ```
 
----
-
-## 🧪 Local Development
+### 3) Run Dev Server
 
 ```bash
-npm install
 npm run dev
 ```
 
-Open: `http://localhost:3000`
+Open `http://localhost:3000`.
 
-Production run:
+### 4) Production Commands
 
 ```bash
 npm run build
@@ -155,67 +140,67 @@ npm run start
 
 ---
 
-## 🔌 API Endpoints
+## NPM Scripts
 
-| Route | Method | Description |
+- `npm run dev` - start dev server (Turbopack)
+- `npm run build` - production build (Turbopack)
+- `npm run start` - run built app
+- `npm run lint` - lint via Next.js
+
+---
+
+## API Overview
+
+| Route | Method | Purpose |
 |---|---|---|
-| `/api/chat` | POST | Stream AI response with optional stock context |
-| `/api/conversations` | GET, POST | List or create conversations |
-| `/api/conversations/[id]` | GET, DELETE | Read/delete a conversation |
-| `/api/conversations/[id]/messages` | GET | Fetch paginated messages |
+| `/api/chat` | POST | Stream AI response (general or stock-context mode) |
+| `/api/conversations` | GET, POST | List/create conversations |
+| `/api/conversations/[id]` | GET, DELETE | Read/delete conversation |
+| `/api/conversations/[id]/messages` | GET | Paginated messages |
 | `/api/portfolio` | GET, POST | List/add holdings |
 | `/api/portfolio/[id]` | PUT, DELETE | Update/delete holding |
 | `/api/watchlist` | GET, POST, DELETE | Manage watchlist |
-| `/api/stock/search` | GET | Search symbols |
-| `/api/stock/quote` | GET | Get quote |
-| `/api/daily-brief` | GET, POST | Fetch or generate daily brief |
+| `/api/stock/search` | GET | Symbol/company search |
+| `/api/stock/quote` | GET | Quote data |
+| `/api/daily-brief` | GET, POST | Fetch/generate daily brief |
+| `/api/test-ai` | GET | Quick provider readiness check |
 
 ---
 
-## ⏱️ Scheduled Brief Automation
+## Response Model
 
-Configured via `vercel.json`:
+Chat responses are tuned for **Contextual AI Synthesis**:
 
-```json
-{
-  "crons": [
-    { "path": "/api/daily-brief", "schedule": "0 3 * * *" }
-  ]
-}
-```
+1. Direct answer
+2. Context signals (price/technicals/fundamentals)
+3. News synthesis (not raw link dump)
+4. Risks and uncertainty
+5. Practical takeaway
 
-Modes:
-
-1. **User mode**: generate the logged-in user’s brief
-2. **Cron mode**: generate briefs for all users with holdings
+The UI is configured for **text-first outputs** (no forced chart/news card clutter in chat body).
 
 ---
 
-## 📁 Project Structure
+## Security Notes
 
-```text
-src/
-  app/
-    (app)/                 # authenticated app pages
-    api/                   # route handlers
-    auth/callback/         # OAuth callback
-    login/, signup/        # auth pages
-  components/              # chat, layout, portfolio, shared UI
-  lib/                     # ai, stock, supabase, hooks, utils
-  stores/                  # Zustand store
-  types/                   # shared TS types
-supabase/
-  schema.sql
-```
+- Supabase auth gates protected routes.
+- Row-Level Security isolates user-owned data.
+- Conversation and message reads are user-scoped.
+- Service role key is server-only and must never be exposed client-side.
 
 ---
 
-## ✅ Status
+## Deployment Notes
 
-Production build passes successfully.
+- Designed for Vercel-compatible Next.js deployment.
+- Optional scheduled brief generation can run via cron hitting `/api/daily-brief`.
+- Ensure env vars are set in deployment environment before first run.
 
-## 📈 Market Data Reliability Notes
+---
 
-- Quote and history requests use Yahoo's v8 chart endpoint directly to avoid crumb/cookie failures and `429` issues seen in SDK quote/history flows.
-- Symbol discovery and news lookup use Yahoo's v1 search endpoint.
+## Status
+
+- Local TypeScript check: passing (`npx tsc --noEmit`).
+- Active AI providers: Mistral + Gemini.
+- Branding updated to custom AlphaSight logo.
 

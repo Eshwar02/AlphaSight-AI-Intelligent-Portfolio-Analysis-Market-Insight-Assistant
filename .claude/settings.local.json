@@ -12,7 +12,19 @@
       "Bash(ls .env*)",
       "WebSearch",
       "Bash(grep -n \"loadConversation\\\\|stockData\\\\|metadata\" E:/alphasight_ai/src/stores/app-store.ts E:/alphasight_ai/src/lib/hooks/*.ts)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(wc -l /e/alphasight_ai/src/**/*.tsx /e/alphasight_ai/src/**/*.ts)",
+      "Bash(npm run:*)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -s -i -X POST http://localhost:3001/api/chat -H \"Content-Type: application/json\" -d '{\"message\":\"hey\"}' --max-time 30)",
+      "Bash(curl -s -i http://localhost:3001/api/conversations --max-time 10)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 23160)",
+      "Bash(npm run *)",
+      "Bash(echo \"PID=$!\")",
+      "Read(//tmp/**)"
     ]
   }
 }

@@ -153,12 +153,35 @@ export function Providers({ children }: ProvidersProps) {
           // Guard against out-of-order async responses when conversation switches fast.
           if (state.activeConversationId !== conversationId) return;
 
-          // If our local state has more messages than the DB returned (because
-          // the assistant message was just persisted async and the DB read
-          // landed before that write), keep local state — it's fresher.
-          const localForConv = state.messages.filter(
-            (m) => m.conversation_id === conversationId,
+          // If our local state has fresher assistant text than this DB snapshot,
+          // keep local state and wait for the next hydration cycle.
+          const localForConv = state.messages.filter((m) => m.conversation_id === conversationId);
+          const localAssistantWithText = state.messages.some(
+            (m) =>
+              m.role === 'assistant' &&
+              m.content.trim().length > 0 &&
+              // optimistic assistant can briefly have empty conversation_id
+              (m.conversation_id === conversationId || !m.conversation_id),
           );
+          const mappedAssistantWithText = mappedMessages.some(
+            (m) => m.role === 'assistant' && m.content.trim().length > 0,
+          );
+          const mappedIds = new Set(mappedMessages.map((m) => m.id));
+          const hasUnpersistedLocalAssistant = state.messages.some(
+            (m) =>
+              m.role === 'assistant' &&
+              m.content.trim().length > 0 &&
+              (m.conversation_id === conversationId || !m.conversation_id) &&
+              !mappedIds.has(m.id),
+          );
+
+          // DB has not caught up with local assistant yet.
+          if (localAssistantWithText && (!mappedAssistantWithText || hasUnpersistedLocalAssistant)) {
+            console.debug('[providers] keeping local — assistant not yet persisted', conversationId);
+            return;
+          }
+
+          // If local has more rows than DB (persist delay), keep local.
           if (
             localForConv.length > mappedMessages.length &&
             localForConv.some((m) => m.role === 'assistant' && m.content.trim().length > 0)

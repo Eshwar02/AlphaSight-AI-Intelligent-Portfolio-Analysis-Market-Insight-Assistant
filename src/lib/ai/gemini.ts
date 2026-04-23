@@ -129,7 +129,7 @@ function getGeminiClient(): GoogleGenAI {
 
 // Model selection. Gemini 2.0 Flash is the default for chat and stock analysis
 // (fast, high quality, generous free tier). 8b-equivalent fallback isn't
-// needed because Gemini's rate limits are different from Groq's.
+// needed because Gemini's rate limits differ from Mistral's.
 // Verified working with the configured API key. If you change keys and one of
 // these stops working, run `node scripts/test-gemini.mjs` to discover which
 // models your key can call.
@@ -180,7 +180,7 @@ Rules:
       config: {
         systemInstruction: systemPrompt,
         temperature: 0,
-        maxOutputTokens: 160,
+        maxOutputTokens: 96,
         responseMimeType: "application/json",
       },
     });
@@ -376,11 +376,7 @@ function buildStockContext(analysis: StockAnalysis): string {
   if (news.length > 0) {
     context += `### Recent News (${news.length} items)\n`;
     for (const item of news.slice(0, 8)) {
-      if (item.url) {
-        context += `- [${item.title}](${item.url}) — ${item.source} (${item.publishedAt.split("T")[0]})\n`;
-      } else {
-        context += `- ${item.title} — ${item.source} (${item.publishedAt.split("T")[0]})\n`;
-      }
+      context += `- ${item.title} — ${item.source} (${item.publishedAt.split("T")[0]})\n`;
     }
     context += "\n";
   }
@@ -420,15 +416,50 @@ type ChatRole = "user" | "assistant";
  * Convert our internal {role: user|assistant} history to Gemini's
  * {role: user|model} content array.
  */
+const GEMINI_HISTORY_MSG_CHAR_CAP = 320;
+
+function readGeminiChunkText(chunk: unknown): string {
+  if (!chunk || typeof chunk !== "object") return "";
+
+  const directText = (chunk as { text?: unknown }).text;
+  if (typeof directText === "string") return directText;
+  if (typeof directText === "function") {
+    try {
+      const value = directText();
+      return typeof value === "string" ? value : "";
+    } catch {
+      return "";
+    }
+  }
+
+  const candidates = (chunk as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: unknown }> };
+    }>;
+  }).candidates;
+  const parts = candidates?.[0]?.content?.parts;
+  if (!parts) return "";
+
+  return parts
+    .map((p) => (typeof p.text === "string" ? p.text : ""))
+    .join("");
+}
+
 function toGeminiContents(
   conversationHistory: Array<{ role: ChatRole; content: string }>,
   latestMessage: string
 ) {
   const contents = [
-    ...conversationHistory.map((m) => ({
-      role: m.role === "assistant" ? ("model" as const) : ("user" as const),
-      parts: [{ text: m.content }],
-    })),
+    ...conversationHistory.slice(-4).map((m) => {
+      const text =
+        m.content.length > GEMINI_HISTORY_MSG_CHAR_CAP
+          ? m.content.slice(0, GEMINI_HISTORY_MSG_CHAR_CAP) + " …[truncated]"
+          : m.content;
+      return {
+        role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+        parts: [{ text }],
+      };
+    }),
     { role: "user" as const, parts: [{ text: latestMessage }] },
   ];
   return contents;
@@ -452,7 +483,7 @@ Here is the real-time data you should reference in your response:
 
 ${stockContext}`;
 
-  const recentHistory = conversationHistory.slice(-10);
+  const recentHistory = conversationHistory.slice(-4);
   const contents = toGeminiContents(recentHistory, message);
 
   const client = getGeminiClient();
@@ -477,13 +508,13 @@ ${stockContext}`;
           config: {
             systemInstruction,
             temperature: 0.35,
-            maxOutputTokens: 8192,
+            maxOutputTokens: 1500,
           },
         });
 
         for await (const chunk of streamResp) {
           chunkCount++;
-          const text = chunk.text;
+          const text = readGeminiChunkText(chunk);
           if (text) {
             charCount += text.length;
             controller.enqueue(encoder.encode(text));
@@ -519,7 +550,7 @@ export async function streamGeneralChat(
   message: string,
   conversationHistory: Array<{ role: ChatRole; content: string }>
 ): Promise<ReadableStream<Uint8Array>> {
-  const recentHistory = conversationHistory.slice(-10);
+  const recentHistory = conversationHistory.slice(-4);
   const contents = toGeminiContents(recentHistory, message);
 
   const client = getGeminiClient();
@@ -544,13 +575,13 @@ export async function streamGeneralChat(
           config: {
             systemInstruction: GENERAL_CHAT_PROMPT,
             temperature: 0.35,
-            maxOutputTokens: 3072,
+            maxOutputTokens: 800,
           },
         });
 
         for await (const chunk of streamResp) {
           chunkCount++;
-          const text = chunk.text;
+          const text = readGeminiChunkText(chunk);
           if (text) {
             charCount += text.length;
             controller.enqueue(encoder.encode(text));
@@ -680,13 +711,13 @@ export function streamAnalysis(data: StockAnalysis): ReadableStream<Uint8Array> 
           config: {
             systemInstruction: STOCK_ANALYSIS_SYSTEM_PROMPT,
             temperature: 0.3,
-            maxOutputTokens: 8192,
+            maxOutputTokens: 1500,
             topP: 0.9,
           },
         });
 
         for await (const chunk of streamResp) {
-          const text = chunk.text;
+          const text = readGeminiChunkText(chunk);
           if (text) {
             controller.enqueue(encoder.encode(text));
           }
@@ -720,7 +751,7 @@ export async function generateAnalysis(data: StockAnalysis): Promise<string> {
       config: {
         systemInstruction: STOCK_ANALYSIS_SYSTEM_PROMPT,
         temperature: 0.3,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 1500,
         topP: 0.9,
       },
     });
@@ -744,7 +775,7 @@ export async function generateDailyBrief(prompt: string): Promise<string> {
     config: {
       systemInstruction: DAILY_BRIEF_PROMPT,
       temperature: 0.6,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 700,
     },
   });
 

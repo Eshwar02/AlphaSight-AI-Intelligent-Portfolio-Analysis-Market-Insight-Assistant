@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Menu, LogOut, User, ArrowLeft } from 'lucide-react';
+import Image from 'next/image';
 import { useAppStore } from '@/stores/app-store';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -97,7 +98,7 @@ export function Header() {
         className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-gray-300 transition-colors hover:bg-dark-850 hover:text-gray-100"
         aria-label="Go to chat home"
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-accent-brand" />
+        <Image src="/logo.svg" alt="AlphaSight" width={14} height={14} />
         <span>AlphaSight</span>
         <span className="text-dark-500">/</span>
         <span className="text-dark-400">Pro</span>

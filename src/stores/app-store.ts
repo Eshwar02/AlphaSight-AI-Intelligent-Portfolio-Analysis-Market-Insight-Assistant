@@ -107,18 +107,74 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ messages: [...s.messages, message] })),
 
   updateMessage: (id, partial) =>
-    set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === id ? { ...m, ...partial } : m,
-      ),
-    })),
+    set((s) => {
+      const targetIdx = s.messages.findIndex((m) => m.id === id);
+      if (targetIdx !== -1) {
+        const next = [...s.messages];
+        next[targetIdx] = { ...next[targetIdx], ...partial };
+        return { messages: next };
+      }
+
+      // Fallback for race conditions where DB hydration replaced optimistic IDs
+      // while a stream is still in flight: patch a likely current assistant row.
+      const fallbackIdx =
+        [...s.messages]
+          .map((m, i) => ({ m, i }))
+          .reverse()
+          .find(
+            ({ m }) =>
+              m.role === 'assistant' &&
+              (m.isStreaming ||
+                (s.activeConversationId ? m.conversation_id === s.activeConversationId : false)),
+          )?.i ??
+        [...s.messages]
+        .map((m, i) => ({ m, i }))
+        .reverse()
+        .find(({ m }) => m.role === 'assistant')?.i;
+      if (fallbackIdx === undefined) return { messages: s.messages };
+
+      const next = [...s.messages];
+      next[fallbackIdx] = { ...next[fallbackIdx], ...partial };
+      return { messages: next };
+    }),
 
   appendToMessage: (id, chunk) =>
-    set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === id ? { ...m, content: m.content + chunk } : m,
-      ),
-    })),
+    set((s) => {
+      const targetIdx = s.messages.findIndex((m) => m.id === id);
+      if (targetIdx !== -1) {
+        const next = [...s.messages];
+        next[targetIdx] = {
+          ...next[targetIdx],
+          content: next[targetIdx].content + chunk,
+        };
+        return { messages: next };
+      }
+
+      // Same fallback strategy as updateMessage to prevent "blank assistant"
+      // when optimistic IDs are replaced during stream.
+      const fallbackIdx =
+        [...s.messages]
+          .map((m, i) => ({ m, i }))
+          .reverse()
+          .find(
+            ({ m }) =>
+              m.role === 'assistant' &&
+              (m.isStreaming ||
+                (s.activeConversationId ? m.conversation_id === s.activeConversationId : false)),
+          )?.i ??
+        [...s.messages]
+        .map((m, i) => ({ m, i }))
+        .reverse()
+        .find(({ m }) => m.role === 'assistant')?.i;
+      if (fallbackIdx === undefined) return { messages: s.messages };
+
+      const next = [...s.messages];
+      next[fallbackIdx] = {
+        ...next[fallbackIdx],
+        content: next[fallbackIdx].content + chunk,
+      };
+      return { messages: next };
+    }),
 
   updateLastMessage: (content) =>
     set((s) => {

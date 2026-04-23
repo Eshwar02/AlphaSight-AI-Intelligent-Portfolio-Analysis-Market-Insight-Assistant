@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import {
   Plus,
   MessageSquare,
@@ -145,17 +146,7 @@ export function Sidebar() {
       {/* ── Brand row ────────────────────────── */}
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <div className="flex items-center gap-2 px-1">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            className="h-5 w-5 text-accent-brand"
-            aria-hidden="true"
-          >
-            <path
-              d="M12 2.5 13.6 9.2 20.3 10.8 13.6 12.4 12 19.1 10.4 12.4 3.7 10.8 10.4 9.2 12 2.5Z"
-              fill="currentColor"
-            />
-          </svg>
+          <Image src="/logo.svg" alt="AlphaSight" width={20} height={20} />
           <span className="text-[13px] font-semibold tracking-tight text-gray-100">
             AlphaSight
           </span>
