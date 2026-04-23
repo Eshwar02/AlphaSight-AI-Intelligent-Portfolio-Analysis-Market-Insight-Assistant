@@ -55,12 +55,6 @@ function StreamingDots() {
   );
 }
 
-function TypingCursor() {
-  return (
-    <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-[3px] animate-pulse bg-accent-brand/70" />
-  );
-}
-
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isStreaming = message.isStreaming;
@@ -136,7 +130,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     streaming={isStreaming}
                   />
                 </MarkdownErrorBoundary>
-                {isStreaming && <TypingCursor />}
               </div>
             ) : isStreaming ? (
               <StreamingDots />

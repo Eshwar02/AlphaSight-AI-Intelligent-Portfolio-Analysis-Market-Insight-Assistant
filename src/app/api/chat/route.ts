@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { streamChat, validateAiSetup } from "@/lib/ai";
+import { classifyIntent, streamChat, validateAiSetup } from "@/lib/ai";
 import { resolveSymbol } from "@/lib/stock/symbols";
 import { fetchQuote, fetchHistory, fetchCompanyInfo } from "@/lib/stock/data";
 import { fetchStockNews } from "@/lib/stock/news";
@@ -12,9 +12,13 @@ const EMPTY_RESPONSE_FALLBACK =
   "Unable to generate analysis right now. Showing available data below.";
 
 const TICKER_PATTERN = /\$([A-Z]{1,10}(?:\.[A-Z]{1,2})?)\b/;
-const STOCK_KEYWORDS =
-  /\b(stock|share|price|quote|analysis|analyze|ticker|buy|sell|hold|chart|support|resistance|rsi|sma)\b/i;
+const NOUN_PHRASE_PATTERN =
+  /(?:analyze|analysis\s+of|price\s+of|quote\s+for|stock\s+of)\s+([a-zA-Z0-9.&\-\s]{2,40})/i;
 
+// Regex-only stock detection. Returns a high-confidence match (dollar ticker,
+// bare all-caps ticker, or explicit "analyze X" noun phrase) or null.
+// Keyword-only matches ("hold on", "what is rsi") used to trigger stock mode
+// here — they're now deferred to the LLM classifier to avoid false positives.
 function detectStockQuery(message: string): string | null {
   const trimmed = message.trim();
   if (!trimmed) return null;
@@ -24,14 +28,18 @@ function detectStockQuery(message: string): string | null {
 
   if (/^[A-Z]{1,10}(\.[A-Z]{1,2})?$/.test(trimmed)) return trimmed.toUpperCase();
 
-  if (!STOCK_KEYWORDS.test(trimmed)) return null;
-
-  const nounPhraseMatch = trimmed.match(
-    /(?:stock|price|analysis|quote)\s+(?:for|of|on)\s+([a-zA-Z0-9.&\-\s]{2,40})/i
-  );
+  const nounPhraseMatch = trimmed.match(NOUN_PHRASE_PATTERN);
   if (nounPhraseMatch?.[1]) return nounPhraseMatch[1].trim();
 
-  return trimmed;
+  return null;
+}
+
+function isGreeting(message: string): boolean {
+  const t = message.trim().toLowerCase().replace(/[!.?]+$/g, "");
+  if (t.length <= 20 && /^(hi|hey|hello|yo|sup|howdy|good\s+(morning|afternoon|evening|night)|thanks|thank\s+you|ok|okay|bye)$/.test(t)) {
+    return true;
+  }
+  return false;
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -252,15 +260,54 @@ export async function POST(request: NextRequest) {
     let stockAnalysis: StockAnalysis | null = null;
     let llmMessage = incomingMessage;
     let chatMode: "stock" | "general" = "general";
+    let generalKind: "brief" | "normal" = "normal";
 
-    const stockQuery = detectStockQuery(incomingMessage);
-    console.debug("[chat-api] stock detection", { stockQuery: stockQuery ?? null });
+    // Intent pipeline:
+    // 1. Regex (high-confidence stock signals) → stock mode candidate
+    // 2. Classifier LLM fallback → stock / greeting / general
+    let stockQuery: string | null = detectStockQuery(incomingMessage);
+    console.debug("[chat-api] regex detection", { stockQuery: stockQuery ?? null });
+
+    if (!stockQuery) {
+      if (isGreeting(incomingMessage)) {
+        generalKind = "brief";
+        console.debug("[chat-api] greeting shortcut");
+      } else {
+        try {
+          const intent = await withTimeout(
+            classifyIntent(incomingMessage),
+            3000,
+            "classifyIntent"
+          );
+          console.debug("[chat-api] classifier result", intent ?? null);
+          if (intent) {
+            if (intent.intent === "stock_query" || intent.intent === "comparison") {
+              stockQuery =
+                intent.company_name ||
+                (intent.symbols && intent.symbols[0]) ||
+                incomingMessage;
+            } else if (intent.intent === "greeting") {
+              generalKind = "brief";
+            }
+          }
+        } catch (error) {
+          console.warn("[chat-api] classifier failed", error instanceof Error ? error.message : error);
+        }
+      }
+    }
+
     if (stockQuery) {
       const resolvedSymbol = await withTimeout(resolveSymbol(stockQuery), 7000, "resolveSymbol");
       console.debug("[chat-api] symbol resolution", {
         query: stockQuery,
         symbol: resolvedSymbol ?? null,
       });
+      if (!resolvedSymbol) {
+        // Classifier or regex thought this was a stock, but we couldn't
+        // resolve a ticker. Answer in general mode with a short note instead
+        // of forcing the 8-section stock prompt.
+        llmMessage = `${incomingMessage}\n\n(Context note for the assistant: I tried to look up live market data for "${stockQuery}" but no matching ticker was found. Answer the user's question helpfully without pretending to have real-time prices.)`;
+      }
       if (resolvedSymbol) {
         try {
           const quote = await withTimeout(fetchQuote(resolvedSymbol), 9000, "fetchQuote");
@@ -319,6 +366,7 @@ export async function POST(request: NextRequest) {
           message: llmMessage,
           history: conversationHistory,
           analysis: stockAnalysis ?? undefined,
+          kind: generalKind,
         }),
         25_000,
         "streamChat"

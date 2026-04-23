@@ -354,15 +354,16 @@ export async function streamStockAnalysis(
 
 export async function streamGeneralChat(
   message: string,
-  conversationHistory: Array<{ role: ChatRole; content: string }>
+  conversationHistory: Array<{ role: ChatRole; content: string }>,
+  kind: "brief" | "normal" = "normal"
 ): Promise<ReadableStream<Uint8Array>> {
   const stream = await generateResponse(message, {
     systemPrompt: GENERAL_CHAT_PROMPT,
     history: conversationHistory,
     model: GENERAL_CHAT_MODEL,
     stream: true,
-    temperature: 0.6,
-    maxTokens: 3072,
+    temperature: kind === "brief" ? 0.8 : 0.6,
+    maxTokens: kind === "brief" ? 256 : 3072,
     timeoutMs: 45_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;

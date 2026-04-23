@@ -22,6 +22,7 @@ interface StreamChatArgs {
   message: string;
   history: ChatHistory;
   analysis?: StockAnalysis;
+  kind?: "brief" | "normal";
 }
 
 export function validateAiSetup(): {
@@ -59,7 +60,7 @@ export async function streamChat(
     if (!args.analysis) throw new Error("Stock mode requires analysis data");
     return mistralStockStream(args.message, args.analysis, args.history);
   }
-  return mistralGeneralStream(args.message, args.history);
+  return mistralGeneralStream(args.message, args.history, args.kind ?? "normal");
 }
 
 export async function generateDailyBrief(prompt: string): Promise<string> {
