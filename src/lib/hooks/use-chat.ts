@@ -150,8 +150,11 @@ export function useChat() {
         const newConvId = res.headers.get('x-conversation-id');
         const effectiveConversationId = newConvId || activeConversationId;
         if (newConvId && !activeConversationId) {
-          setActiveConversation(newConvId);
-          setActiveView('chat');
+          // Stamp local messages with the new conversation_id FIRST so the
+          // providers' loadMessages guard (which filters by conversation_id)
+          // can see the pending assistant bubble and skip the DB overwrite.
+          updateMessage(userMsg.id, { conversation_id: newConvId });
+          updateMessage(assistantMsg.id, { conversation_id: newConvId });
           addConversation({
             id: newConvId,
             user_id: '',
@@ -159,9 +162,8 @@ export function useChat() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
-          // Update user and assistant message IDs with new conversation ID
-          updateMessage(userMsg.id, { conversation_id: newConvId });
-          updateMessage(assistantMsg.id, { conversation_id: newConvId });
+          setActiveConversation(newConvId);
+          setActiveView('chat');
           router.replace(`/chat/${newConvId}`);
         }
 

@@ -71,7 +71,22 @@ export function Providers({ children }: ProvidersProps) {
     async function loadMessages() {
       const conversationId = activeConversationId;
       console.debug('[providers] loading messages for conversation', conversationId);
-      setIsLoadingConversation(true);
+
+      // Don't flash the loading skeleton if we're already streaming into this
+      // conversation — that wipes the assistant bubble mid-stream and leaves
+      // the UI blank until the stream finishes.
+      const preState = useAppStore.getState();
+      const isActiveStream =
+        preState.isStreaming ||
+        preState.messages.some(
+          (m) =>
+            m.conversation_id === conversationId &&
+            m.role === 'assistant' &&
+            (m.isStreaming || !m.content.trim()),
+        );
+      if (!isActiveStream) {
+        setIsLoadingConversation(true);
+      }
       try {
         const res = await fetch(`/api/conversations/${conversationId}/messages`);
         if (res.ok) {
@@ -136,15 +151,29 @@ export function Providers({ children }: ProvidersProps) {
           }
 
           // Guard against out-of-order async responses when conversation switches fast.
-          if (state.activeConversationId === conversationId) {
-            setMessages(mappedMessages);
-            console.debug(
-              '[providers] loaded messages',
-              mappedMessages.length,
-              'for',
-              conversationId
-            );
+          if (state.activeConversationId !== conversationId) return;
+
+          // If our local state has more messages than the DB returned (because
+          // the assistant message was just persisted async and the DB read
+          // landed before that write), keep local state — it's fresher.
+          const localForConv = state.messages.filter(
+            (m) => m.conversation_id === conversationId,
+          );
+          if (
+            localForConv.length > mappedMessages.length &&
+            localForConv.some((m) => m.role === 'assistant' && m.content.trim().length > 0)
+          ) {
+            console.debug('[providers] keeping local — DB read stale', conversationId);
+            return;
           }
+
+          setMessages(mappedMessages);
+          console.debug(
+            '[providers] loaded messages',
+            mappedMessages.length,
+            'for',
+            conversationId
+          );
         }
       } catch {
         // silently fail
