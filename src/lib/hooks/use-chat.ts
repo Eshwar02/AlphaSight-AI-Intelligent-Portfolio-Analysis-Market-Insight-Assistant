@@ -68,9 +68,15 @@ export function useChat() {
       const abortController = new AbortController();
       abortRef.current = abortController;
       let didTimeout = false;
+      let streamingDone = false;
       const timeoutId = setTimeout(() => {
+        if (streamingDone) return;
         didTimeout = true;
-        abortController.abort();
+        try {
+          abortController.abort();
+        } catch {
+          // abort() can throw if the underlying fetch has already settled; ignore
+        }
       }, 60000);
 
       try {
@@ -108,6 +114,8 @@ export function useChat() {
             isStreaming: false,
             content: hasVisibleText(text) ? text : EMPTY_RESPONSE_FALLBACK,
           });
+          streamingDone = true;
+          clearTimeout(timeoutId);
           console.debug('[useChat] sendMessage:json-response-applied', {
             hasText: hasVisibleText(text),
           });
@@ -127,6 +135,8 @@ export function useChat() {
             isStreaming: false,
             content: friendlyMessage,
           });
+          streamingDone = true;
+          clearTimeout(timeoutId);
           console.error('[useChat] sendMessage:non-ok', {
             status: res.status,
             errorMsg,
@@ -184,7 +194,19 @@ export function useChat() {
 
         let firstChunkLogged = false;
         while (!done) {
-          const { value, done: readerDone } = await reader.read();
+          let readResult: ReadableStreamReadResult<Uint8Array>;
+          try {
+            readResult = await reader.read();
+          } catch (readErr) {
+            // reader.read() rejects with AbortError when we abort the fetch
+            // on timeout. Let the outer catch handle the UI; just bail out
+            // of the loop without surfacing a scary stream error overlay.
+            if (readErr instanceof DOMException && readErr.name === 'AbortError') {
+              break;
+            }
+            throw readErr;
+          }
+          const { value, done: readerDone } = readResult;
           done = readerDone;
           if (value) {
             const text = decoder.decode(value, { stream: true });
@@ -202,6 +224,8 @@ export function useChat() {
             appendToMessage(assistantMsg.id, text);
           }
         }
+        streamingDone = true;
+        clearTimeout(timeoutId);
         console.debug('[useChat] sendMessage:stream-complete', {
           collectedAny,
           chars: fullAssistantText.length,
