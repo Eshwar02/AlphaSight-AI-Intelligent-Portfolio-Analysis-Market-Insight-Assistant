@@ -47,10 +47,10 @@ function AssistantMark() {
 
 function StreamingDots() {
   return (
-    <div className="flex items-center gap-1 py-2">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-brand [animation-delay:0ms]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-brand [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent-brand [animation-delay:300ms]" />
+    <div className="flex items-center gap-1.5 py-2">
+      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-300 [animation-delay:0ms]" />
+      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-300 [animation-delay:150ms]" />
+      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-300 [animation-delay:300ms]" />
     </div>
   );
 }
@@ -78,6 +78,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
     [normalizedContent],
   );
   const hasContent = visibleText.length > 0;
+
+  if (process.env.NODE_ENV !== 'production' && !isUser) {
+    console.debug('[ChatMessage] render', {
+      id: message.id,
+      isStreaming,
+      rawLen: message.content.length,
+      visibleLen: visibleText.length,
+      rawPreview: message.content.slice(0, 80),
+    });
+  }
 
   const stockData = useMemo(() => {
     if (!message.stockData) return null;
@@ -122,7 +132,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <AssistantMark />
           <div className="min-w-0 flex-1">
             {/* Body */}
-            {hasContent ? (
+            {hasContent && (
               <div className="text-[15px] leading-7 text-gray-200">
                 <MarkdownErrorBoundary content={normalizedContent}>
                   <MarkdownRenderer
@@ -131,10 +141,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   />
                 </MarkdownErrorBoundary>
               </div>
-            ) : isStreaming ? (
-              <StreamingDots />
-            ) : (
-              <div className="text-[15px] leading-7 text-gray-200">
+            )}
+            {!hasContent && isStreaming && <StreamingDots />}
+            {!hasContent && !isStreaming && (
+              <div className="text-[15px] leading-7 text-gray-400 italic">
                 {EMPTY_RESPONSE_FALLBACK}
               </div>
             )}
