@@ -45,15 +45,31 @@ function LoginPageContent() {
     setError(null);
     setGoogleLoading(true);
 
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
-      },
-    });
+    try {
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+          scopes: 'openid email profile',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
 
-    if (oauthError) {
-      setError(oauthError.message);
+      if (oauthError) {
+        console.error("[Google Login] OAuth error:", oauthError);
+        setError(oauthError.message || "Failed to sign in with Google");
+        setGoogleLoading(false);
+        return;
+      }
+
+      // Note: If successful, the user will be redirected by the OAuth flow
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      console.error("[Google Login] Unexpected error:", err);
+      setError(errorMessage);
       setGoogleLoading(false);
     }
   }
