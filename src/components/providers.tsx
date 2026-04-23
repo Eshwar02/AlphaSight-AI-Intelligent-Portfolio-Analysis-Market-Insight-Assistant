@@ -208,5 +208,5 @@ export function Providers({ children }: ProvidersProps) {
     loadMessages();
   }, [activeConversationId, setMessages, setIsLoadingConversation]);
 
-  return <ThemeProvider><>{children}</></ThemeProvider>;
+  return <ThemeProvider>{children}</ThemeProvider>;
 }
