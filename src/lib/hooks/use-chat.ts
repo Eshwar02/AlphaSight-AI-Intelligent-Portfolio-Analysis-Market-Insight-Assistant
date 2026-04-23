@@ -182,6 +182,7 @@ export function useChat() {
         let collectedAny = false;
         let fullAssistantText = '';
 
+        let firstChunkLogged = false;
         while (!done) {
           const { value, done: readerDone } = await reader.read();
           done = readerDone;
@@ -190,6 +191,13 @@ export function useChat() {
             if (text.length > 0) {
               fullAssistantText += text;
               if (hasVisibleText(text)) collectedAny = true;
+              if (!firstChunkLogged) {
+                firstChunkLogged = true;
+                console.debug('[useChat] first-chunk', {
+                  preview: text.slice(0, 120),
+                  length: text.length,
+                });
+              }
             }
             appendToMessage(assistantMsg.id, text);
           }

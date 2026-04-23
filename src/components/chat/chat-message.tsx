@@ -71,7 +71,19 @@ export function ChatMessage({ message }: ChatMessageProps) {
         .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ''),
     [message.content],
   );
-  const hasContent = normalizedContent.trim().length > 0;
+
+  // Count text that would actually render visibly. During streaming, the LLM
+  // often opens with `---` separators or pure whitespace that markdown renders
+  // as an invisible <hr/> — which made the bubble look "stuck" with just a
+  // cursor. Treat content as visible only once we have real characters.
+  const visibleText = useMemo(
+    () =>
+      normalizedContent
+        .replace(/^(?:\s|-{3,}|\*{3,}|_{3,})+/m, '')
+        .trim(),
+    [normalizedContent],
+  );
+  const hasContent = visibleText.length > 0;
 
   const stockData = useMemo(() => {
     if (!message.stockData) return null;
