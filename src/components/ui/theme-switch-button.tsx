@@ -13,38 +13,27 @@ export function ThemeSwitch({ className = '' }: ThemeSwitchProps) {
 
   React.useEffect(() => {
     setMounted(true)
-    const savedTheme =
-      localStorage.getItem('theme') ||
-      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-
-    setTheme(savedTheme as 'light' | 'dark')
-    applyTheme(savedTheme as 'light' | 'dark')
+    const savedTheme = localStorage.getItem('theme') || 'dark'
+    const html = document.documentElement
+    const currentTheme = html.classList.contains('dark') ? 'dark' : 'light'
+    setTheme(currentTheme as 'light' | 'dark')
   }, [])
 
-  const applyTheme = (newTheme: 'light' | 'dark') => {
-    const html = document.documentElement
-    if (newTheme === 'dark') {
-      html.classList.add('dark')
-      html.classList.remove('light')
-    } else {
-      html.classList.add('light')
-      html.classList.remove('dark')
-    }
-  }
-
   const toggleTheme = React.useCallback(() => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
+    const html = document.documentElement
+    const newTheme = html.classList.contains('dark') ? 'light' : 'dark'
+    
+    html.classList.toggle('dark', newTheme === 'dark')
     localStorage.setItem('theme', newTheme)
-    applyTheme(newTheme)
-  }, [theme])
+    setTheme(newTheme)
+  }, [])
 
   if (!mounted) return null
 
   return (
     <button
       onClick={toggleTheme}
-      className={`relative flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:text-gray-100 hover:bg-dark-850 dark:hover:bg-dark-850 light:hover:bg-light-200 transition-all overflow-hidden ${className}`}
+      className={`relative flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:text-gray-100 hover:bg-dark-850 dark:hover:bg-dark-850 transition-all overflow-hidden ${className}`}
       aria-label="Toggle theme"
       title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
     >

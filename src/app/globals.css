@@ -8,15 +8,15 @@
   }
 
   body {
-    @apply bg-dark-900 text-gray-300 antialiased;
+    @apply bg-white text-gray-900 antialiased transition-colors duration-300;
   }
 
-  /* Light theme */
-  body.light {
-    @apply bg-white text-gray-900;
+  /* Dark theme */
+  html.dark body {
+    @apply bg-dark-900 text-gray-300;
   }
 
-  /* Custom scrollbar - dark */
+  /* Custom scrollbar - light theme default */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -27,49 +27,50 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-dark-700;
+    background: #d1d5db;
+    border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+
+  /* Dark theme scrollbar */
+  html.dark ::-webkit-scrollbar-thumb {
+    @apply bg-dark-700;
+  }
+
+  html.dark ::-webkit-scrollbar-thumb:hover {
     @apply bg-dark-600;
-  }
-
-  /* Light theme scrollbar */
-  body.light ::-webkit-scrollbar-thumb {
-    background: #e5e7eb;
-  }
-
-  body.light ::-webkit-scrollbar-thumb:hover {
-    background: #d1d5db;
   }
 
   /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #4a4a5a transparent;
+    scrollbar-color: #d1d5db transparent;
   }
 
-  body.light {
-    scrollbar-color: #e5e7eb transparent;
+  html.dark {
+    scrollbar-color: #4a4a5a transparent;
   }
 }
 
 @layer components {
   /* Markdown / Prose overrides */
   .prose pre {
-    @apply rounded-lg border border-dark-700 bg-dark-950;
+    @apply rounded-lg border border-gray-300 bg-gray-50;
   }
 
-  body.light .prose pre {
-    @apply border-gray-300 bg-gray-50;
+  html.dark .prose pre {
+    @apply border-dark-700 bg-dark-950;
   }
 
   .prose code:not(pre code) {
-    @apply rounded bg-dark-950 px-1.5 py-0.5 text-accent-green;
+    @apply rounded bg-gray-100 px-1.5 py-0.5 text-accent-green;
   }
 
-  body.light .prose code:not(pre code) {
-    @apply bg-gray-100 text-accent-green;
+  html.dark .prose code:not(pre code) {
+    @apply bg-dark-950 text-accent-green;
   }
 
   .prose a {
@@ -81,27 +82,27 @@
   }
 
   .prose th {
-    @apply border-b border-dark-700 px-3 py-2 text-left text-sm font-semibold text-gray-100;
+    @apply border-b border-gray-300 px-3 py-2 text-left text-sm font-semibold text-gray-900;
   }
 
-  body.light .prose th {
-    @apply border-b border-gray-300 text-gray-900;
+  html.dark .prose th {
+    @apply border-b border-dark-700 text-gray-100;
   }
 
   .prose td {
-    @apply border-b border-dark-700/50 px-3 py-2 text-sm;
+    @apply border-b border-gray-300/50 px-3 py-2 text-sm;
   }
 
-  body.light .prose td {
-    @apply border-b border-gray-300/50;
+  html.dark .prose td {
+    @apply border-b border-dark-700/50;
   }
 
   .prose blockquote {
-    @apply border-l-2 border-dark-600 italic text-dark-400;
+    @apply border-l-2 border-gray-300 italic text-gray-600;
   }
 
-  body.light .prose blockquote {
-    @apply border-l-2 border-gray-300 text-gray-600;
+  html.dark .prose blockquote {
+    @apply border-l-2 border-dark-600 text-dark-400;
   }
 
   /* Chat message animation */
