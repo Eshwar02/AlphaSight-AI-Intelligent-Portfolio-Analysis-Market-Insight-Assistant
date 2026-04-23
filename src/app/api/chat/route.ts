@@ -193,12 +193,11 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       message?: string;
       conversationId?: string;
-      model?: "mistral" | "gemini";
+      model?: "mistral";
     };
     const incomingMessage = body.message?.trim() ?? "";
     const requestedConversationId = body.conversationId ?? null;
-    const requestedModel: "mistral" | "gemini" =
-      body.model === "gemini" ? "gemini" : "mistral";
+    const requestedModel: "mistral" = "mistral";
 
     if (!incomingMessage) {
       return chatJsonResponse("Please enter a message.", 400, {

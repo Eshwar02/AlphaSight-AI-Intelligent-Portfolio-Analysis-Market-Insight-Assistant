@@ -53,8 +53,8 @@ interface AppState {
   setIsLoadingConversation: (v: boolean) => void;
 
   /* ── Model preference (user-selected via composer dropdown) ─────── */
-  preferredModel: 'mistral' | 'gemini';
-  setPreferredModel: (model: 'mistral' | 'gemini') => void;
+  preferredModel: 'mistral';
+  setPreferredModel: (model: 'mistral') => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -194,9 +194,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsLoadingConversation: (v) => set({ isLoadingConversation: v }),
 
   /* ── Model preference ────────────────────── */
-  // Default to Mistral once the backend migration lands; Gemini is the
-  // fallback / backup. The current backend ignores this field until the
-  // `/api/chat` route reads `body.model`.
+  // Mistral-only model selection.
   preferredModel: 'mistral',
   setPreferredModel: (model) => set({ preferredModel: model }),
 }));

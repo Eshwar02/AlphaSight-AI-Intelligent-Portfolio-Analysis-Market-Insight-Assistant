@@ -3,6 +3,7 @@ import { yahoo } from "@/lib/stock/yahoo";
 
 const MARKETAUX_API_KEY = process.env.MARKETAUX_API_KEY;
 const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
+const MAX_NEWS_ITEMS = 12;
 
 interface NewsdataArticle {
   title: string;
@@ -48,6 +49,123 @@ interface MarketauxArticle {
   snippet: string;
 }
 
+const SOURCE_SITES = [
+  "mint",
+  "goodreturns",
+  "moneycontrol",
+  "economictimes",
+  "livemint",
+  "business-standard",
+  "reuters",
+  "bloomberg",
+];
+
+const COMPANY_PRODUCT_THEMES: Array<{
+  matcher: RegExp;
+  themes: string[];
+}> = [
+  {
+    matcher: /\b(amara\s*raja|amararaja|amraraaja|amara\s*raja\s*energy)\b/i,
+    themes: [
+      "lithium battery",
+      "lithium ion cell",
+      "ev battery",
+      "energy storage battery",
+      "lead acid battery",
+    ],
+  },
+  {
+    matcher: /\b(reliance|ril)\b/i,
+    themes: ["petrochemicals", "new energy", "solar", "green hydrogen"],
+  },
+];
+
+function decodeXmlEntities(input: string): string {
+  return input
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+}
+
+function extractTag(block: string, tag: string): string {
+  const match = block.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i"));
+  return decodeXmlEntities(match?.[1]?.trim() || "");
+}
+
+function sourceFromLink(link: string): string {
+  try {
+    const host = new URL(link).hostname.toLowerCase();
+    if (host.includes("mint")) return "Mint";
+    if (host.includes("goodreturns")) return "GoodReturns";
+    if (host.includes("moneycontrol")) return "Moneycontrol";
+    if (host.includes("economictimes")) return "Economic Times";
+    if (host.includes("livemint")) return "Mint";
+    if (host.includes("reuters")) return "Reuters";
+    if (host.includes("bloomberg")) return "Bloomberg";
+    return host.replace(/^www\./, "");
+  } catch {
+    return "Google News";
+  }
+}
+
+async function fetchGoogleNewsRss(query: string): Promise<NewsItem[]> {
+  if (!query.trim()) return [];
+
+  try {
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(
+      query
+    )}&hl=en-IN&gl=IN&ceid=IN:en`;
+    const res = await fetch(url, { next: { revalidate: 120 } });
+    if (!res.ok) return [];
+    const xml = await res.text();
+
+    const items: NewsItem[] = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+    let match: RegExpExecArray | null = itemRegex.exec(xml);
+
+    while (match) {
+      const block = match[1];
+      const title = extractTag(block, "title");
+      const link = extractTag(block, "link");
+      const pubDate = extractTag(block, "pubDate");
+      const description = extractTag(block, "description");
+      const source = sourceFromLink(link);
+
+      if (title && link) {
+        items.push({
+          title,
+          url: link,
+          source,
+          publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+          summary: description || title,
+        });
+      }
+
+      match = itemRegex.exec(xml);
+    }
+
+    return items.slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+function deriveThemeQueries(symbol: string, companyName: string): string[] {
+  const base = `${companyName || symbol}`.trim();
+  const themeSet = new Set<string>();
+
+  for (const entry of COMPANY_PRODUCT_THEMES) {
+    if (entry.matcher.test(base) || entry.matcher.test(symbol)) {
+      for (const t of entry.themes) themeSet.add(`${base} ${t}`);
+    }
+  }
+
+  return Array.from(themeSet);
+}
+
 /**
  * Fetch real-time news from MarketAux API
  */
@@ -85,17 +203,34 @@ async function fetchMarketauxNews(symbol: string): Promise<NewsItem[]> {
  */
 export async function fetchStockNews(
   symbol: string,
-  companyName: string = ""
+  companyName: string = "",
+  extraThemeQueries: string[] = []
 ): Promise<NewsItem[]> {
+  const themeQueries =
+    extraThemeQueries.length > 0
+      ? extraThemeQueries
+      : deriveThemeQueries(symbol, companyName);
+
   // Try MarketAux first for real-time news
   const marketauxNews = await fetchMarketauxNews(symbol);
-  if (marketauxNews.length >= 3) return marketauxNews;
 
   // Try NewsData.io as second source
   const newsdataNews = await fetchNewsdataNews(symbol, companyName);
-  if (newsdataNews.length >= 3) return [...marketauxNews, ...newsdataNews].slice(0, 10);
 
   const newsItems: NewsItem[] = [...marketauxNews, ...newsdataNews];
+
+  // Query Google News RSS for company headlines across common business outlets.
+  const sourceQuery =
+    companyName && companyName.trim().length > 0 ? companyName : symbol.replace(/\.(NS|BO)$/, "");
+  const siteFilter = SOURCE_SITES.map((s) => `site:${s}`).join(" OR ");
+  const googleCompanyNews = await fetchGoogleNewsRss(`${sourceQuery} (${siteFilter})`);
+  newsItems.push(...googleCompanyNews);
+
+  // Product/theme-based enrichment (key requirement).
+  for (const q of themeQueries.slice(0, 4)) {
+    const thematic = await fetchGoogleNewsRss(`${q} (${siteFilter})`);
+    newsItems.push(...thematic);
+  }
 
   // Strategy 1: Search by ticker symbol
   try {
@@ -154,7 +289,7 @@ export async function fetchStockNews(
       (a, b) =>
         new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     )
-    .slice(0, 10);
+    .slice(0, MAX_NEWS_ITEMS);
 }
 
 // ── Helper ───────────────────────────────────────────────────────────

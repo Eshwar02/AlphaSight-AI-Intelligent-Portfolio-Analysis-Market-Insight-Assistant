@@ -50,9 +50,6 @@ export function validateMistralSetup(): { valid: boolean; error?: string } {
   if (!apiKey) {
     return { valid: false, error: "MISTRAL_API_KEY environment variable is not set" };
   }
-  if (apiKey.length < 20) {
-    return { valid: false, error: "MISTRAL_API_KEY looks too short to be valid" };
-  }
   return { valid: true };
 }
 

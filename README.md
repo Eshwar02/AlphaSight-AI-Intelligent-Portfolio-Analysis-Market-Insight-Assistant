@@ -14,7 +14,6 @@
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5" />
   <img src="https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&logoColor=white" alt="Supabase" />
   <img src="https://img.shields.io/badge/AI-Mistral-F97316" alt="Mistral" />
-  <img src="https://img.shields.io/badge/AI-Google%20Gemini-4285F4" alt="Google Gemini" />
 </p>
 
 ---
@@ -38,7 +37,7 @@
 | State | Zustand |
 | Backend | Next.js Route Handlers |
 | Auth + DB | Supabase (Postgres + RLS) |
-| LLM Providers | Mistral (primary), Google Gemini (backup/selectable) |
+| LLM Provider | Mistral |
 | Market Data | Yahoo Finance endpoints |
 | News | MarketAux, NewsData.io, Yahoo fallback |
 
@@ -62,7 +61,7 @@ API (Route Handlers)
   └─ /api/daily-brief
 
 Services
-  ├─ Mistral / Gemini
+  ├─ Mistral
   ├─ Yahoo market endpoints
   └─ News providers
 
@@ -109,11 +108,8 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# AI providers (at least one required; both recommended)
+# AI provider (required)
 MISTRAL_API_KEY=
-GOOGLE_API_KEY=
-# Optional alias accepted by code:
-# GEMINI_API_KEY=
 
 # News providers (optional but recommended)
 MARKETAUX_API_KEY=
@@ -201,6 +197,5 @@ The UI is configured for **text-first outputs** (no forced chart/news card clutt
 ## Status
 
 - Local TypeScript check: passing (`npx tsc --noEmit`).
-- Active AI providers: Mistral + Gemini.
+- Active AI provider: Mistral.
 - Branding updated to custom AlphaSight logo.
-

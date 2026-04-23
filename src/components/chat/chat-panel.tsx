@@ -15,12 +15,6 @@ const MODEL_OPTIONS: ModelOption[] = [
     value: 'mistral',
     description: 'Primary — large free tier',
   },
-  {
-    id: 'gemini',
-    label: 'Gemini',
-    value: 'gemini',
-    description: 'Backup — Google AI Studio',
-  },
 ];
 
 function LoadingSkeleton() {
@@ -119,7 +113,7 @@ export function ChatPanel() {
             placeholder="Ask about any stock, market, or portfolio…"
             modelOptions={MODEL_OPTIONS}
             selectedModel={selectedModel}
-            onModelSelect={(opt) => setPreferredModel(opt.value as 'mistral' | 'gemini')}
+            onModelSelect={(opt) => setPreferredModel(opt.value as 'mistral')}
           />
           <p className="mt-2 text-center text-[11px] text-dark-500">
             AlphaSight can make mistakes. Verify critical financial decisions.
