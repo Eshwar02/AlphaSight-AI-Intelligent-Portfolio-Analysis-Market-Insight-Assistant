@@ -8,6 +8,13 @@ import { generateId } from '@/lib/utils';
 const EMPTY_RESPONSE_FALLBACK =
   'Unable to generate analysis right now. Showing available data below.';
 
+function hasVisibleText(value: string): boolean {
+  return value
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .trim().length > 0;
+}
+
 export function useChat() {
   const router = useRouter();
   const {
@@ -53,6 +60,10 @@ export function useChat() {
       addMessage(userMsg);
       addMessage(assistantMsg);
       setIsStreaming(true);
+      console.debug('[useChat] sendMessage:start', {
+        activeConversationId,
+        messageLength: userMsg.content.length,
+      });
 
       const abortController = new AbortController();
       abortRef.current = abortController;
@@ -75,14 +86,52 @@ export function useChat() {
         });
 
         const contentType = res.headers.get('content-type') || '';
+        console.debug('[useChat] sendMessage:api-response', {
+          status: res.status,
+          contentType,
+          hasBody: Boolean(res.body),
+        });
         if (res.redirected || contentType.includes('text/html')) {
           throw new Error('AUTH_REDIRECT');
+        }
+
+        // Support structured non-stream responses if backend returns JSON.
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json().catch(() => ({} as Record<string, unknown>));
+          const text =
+            typeof data.text === 'string'
+              ? data.text
+              : typeof data.message === 'string'
+                ? data.message
+                : EMPTY_RESPONSE_FALLBACK;
+          updateMessage(assistantMsg.id, {
+            isStreaming: false,
+            content: hasVisibleText(text) ? text : EMPTY_RESPONSE_FALLBACK,
+          });
+          console.debug('[useChat] sendMessage:json-response-applied', {
+            hasText: hasVisibleText(text),
+          });
+          return;
         }
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           const errorMsg = errorData.details || errorData.error || `HTTP ${res.status}`;
-          throw new Error(`Chat request failed: ${res.status} - ${errorMsg}`);
+          const friendlyMessage =
+            res.status === 401
+              ? 'Your session expired. Please log in again.'
+              : res.status === 503
+                ? 'AI service is temporarily unavailable. Please try again in a moment.'
+                : `Unable to generate analysis right now. Showing available data below. (${errorMsg})`;
+          updateMessage(assistantMsg.id, {
+            isStreaming: false,
+            content: friendlyMessage,
+          });
+          console.error('[useChat] sendMessage:non-ok', {
+            status: res.status,
+            errorMsg,
+          });
+          return;
         }
 
         // The server sends a short placeholder so the chart can render
@@ -117,7 +166,14 @@ export function useChat() {
         }
 
         const reader = res.body?.getReader();
-        if (!reader) throw new Error('No response body');
+        if (!reader) {
+          updateMessage(assistantMsg.id, {
+            isStreaming: false,
+            content: EMPTY_RESPONSE_FALLBACK,
+          });
+          console.error('[useChat] sendMessage:no-reader');
+          return;
+        }
 
         const decoder = new TextDecoder();
         let done = false;
@@ -131,15 +187,20 @@ export function useChat() {
             const text = decoder.decode(value, { stream: true });
             if (text.length > 0) {
               fullAssistantText += text;
-              if (text.trim().length > 0) collectedAny = true;
+              if (hasVisibleText(text)) collectedAny = true;
             }
             appendToMessage(assistantMsg.id, text);
           }
         }
+        console.debug('[useChat] sendMessage:stream-complete', {
+          collectedAny,
+          chars: fullAssistantText.length,
+          visible: hasVisibleText(fullAssistantText),
+        });
 
         // Belt-and-suspenders: if the stream closed without a single chunk,
         // put a visible message into the bubble so it's never blank.
-        if (!collectedAny || fullAssistantText.trim().length === 0) {
+        if (!collectedAny || !hasVisibleText(fullAssistantText)) {
           updateMessage(assistantMsg.id, {
             isStreaming: false,
             content: EMPTY_RESPONSE_FALLBACK,
@@ -149,6 +210,9 @@ export function useChat() {
         }
 
         if (effectiveConversationId) {
+          console.debug('[useChat] sendMessage:metadata-hydrate', {
+            conversationId: effectiveConversationId,
+          });
           const hydrateRes = await fetch(
             `/api/conversations/${effectiveConversationId}/messages?limit=200`
           );
@@ -175,11 +239,15 @@ export function useChat() {
                 ...(stockData ? { stockData: stockData as ChatMessage['stockData'] } : {}),
                 ...(newsData ? { newsData: newsData as ChatMessage['newsData'] } : {}),
               });
+              console.debug('[useChat] sendMessage:metadata-applied', {
+                hasStock: Boolean(stockData),
+                hasNews: Boolean(newsData),
+              });
             }
           }
         }
       } catch (err: unknown) {
-        console.error('[useChat] sendMessage error:', err);
+        console.error('CHAT ERROR:', err);
         if (err instanceof DOMException && err.name === 'AbortError') {
           updateMessage(assistantMsg.id, {
             isStreaming: false,

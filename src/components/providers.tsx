@@ -68,11 +68,12 @@ export function Providers({ children }: ProvidersProps) {
       setMessages([]);
       return;
     }
-
     async function loadMessages() {
+      const conversationId = activeConversationId;
+      console.debug('[providers] loading messages for conversation', conversationId);
       setIsLoadingConversation(true);
       try {
-        const res = await fetch(`/api/conversations/${activeConversationId}/messages`);
+        const res = await fetch(`/api/conversations/${conversationId}/messages`);
         if (res.ok) {
           const data = await res.json();
           const mappedMessages: ChatMessage[] = (data.messages || []).map(
@@ -119,7 +120,31 @@ export function Providers({ children }: ProvidersProps) {
               };
             }
           );
-          setMessages(mappedMessages);
+          // Guard against race conditions that can wipe optimistic assistant text:
+          // if the current conversation has a pending/streaming assistant message,
+          // keep local state and skip stale DB hydration for this cycle.
+          const state = useAppStore.getState();
+          const hasPendingAssistant = state.messages.some(
+            (m) =>
+              m.conversation_id === conversationId &&
+              m.role === 'assistant' &&
+              (m.isStreaming || !m.content.trim()),
+          );
+          if (hasPendingAssistant || state.isStreaming) {
+            console.debug('[providers] skipped overwrite due pending assistant', conversationId);
+            return;
+          }
+
+          // Guard against out-of-order async responses when conversation switches fast.
+          if (state.activeConversationId === conversationId) {
+            setMessages(mappedMessages);
+            console.debug(
+              '[providers] loaded messages',
+              mappedMessages.length,
+              'for',
+              conversationId
+            );
+          }
         }
       } catch {
         // silently fail

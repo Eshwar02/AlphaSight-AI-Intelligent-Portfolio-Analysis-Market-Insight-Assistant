@@ -169,6 +169,7 @@ async function openStreamingResponse(response: Response): Promise<ReadableStream
           const { value, done } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
+          buffer = buffer.replace(/\r\n/g, "\n");
 
           let eventEnd = buffer.indexOf("\n\n");
           while (eventEnd !== -1) {
@@ -195,6 +196,27 @@ async function openStreamingResponse(response: Response): Promise<ReadableStream
             }
 
             eventEnd = buffer.indexOf("\n\n");
+          }
+        }
+
+        // Process any trailing event block that may not end with double newline.
+        if (buffer.trim().length > 0) {
+          for (const line of buffer.split("\n")) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(payload) as {
+                choices?: Array<{ delta?: { content?: unknown } }>;
+              };
+              const delta = parsed.choices?.[0]?.delta?.content;
+              if (typeof delta === "string" && delta.length > 0) {
+                controller.enqueue(encoder.encode(delta));
+              }
+            } catch {
+              // ignore malformed trailing payload
+            }
           }
         }
       } catch (error) {

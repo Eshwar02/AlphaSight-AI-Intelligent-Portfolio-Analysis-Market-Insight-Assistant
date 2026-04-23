@@ -64,7 +64,14 @@ function TypingCursor() {
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isStreaming = message.isStreaming;
-  const hasContent = message.content.trim().length > 0;
+  const normalizedContent = useMemo(
+    () =>
+      message.content
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ''),
+    [message.content],
+  );
+  const hasContent = normalizedContent.trim().length > 0;
 
   const stockData = useMemo(() => {
     if (!message.stockData) return null;
@@ -111,9 +118,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {/* Body */}
             {hasContent ? (
               <div className="text-[15px] leading-7 text-gray-200">
-                <MarkdownErrorBoundary content={message.content}>
+                <MarkdownErrorBoundary content={normalizedContent}>
                   <MarkdownRenderer
-                    content={message.content}
+                    content={normalizedContent}
                     streaming={isStreaming}
                   />
                 </MarkdownErrorBoundary>

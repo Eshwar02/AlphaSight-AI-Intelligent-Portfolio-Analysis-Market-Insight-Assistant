@@ -6,6 +6,7 @@ import { Menu, LogOut, User, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { ThemeSwitch } from '@/components/ui/theme-switch-button';
 
 export function Header() {
   const router = useRouter();

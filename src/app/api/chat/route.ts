@@ -122,8 +122,33 @@ function buildStockMetadata(stockAnalysis: StockAnalysis | null): Record<string,
   };
 }
 
+function hasVisibleText(value: string): boolean {
+  return value
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .trim().length > 0;
+}
+
+function chatJsonResponse(
+  text: string,
+  status: number,
+  opts?: { error?: string; details?: string; meta?: Record<string, unknown> }
+) {
+  return NextResponse.json(
+    {
+      text: hasVisibleText(text) ? text : EMPTY_RESPONSE_FALLBACK,
+      charts: [],
+      meta: opts?.meta ?? {},
+      ...(opts?.error ? { error: opts.error } : {}),
+      ...(opts?.details ? { details: opts.details } : {}),
+    },
+    { status }
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
+    console.debug("[chat-api] request received");
     const supabase = await createClient();
     const {
       data: { user },
@@ -131,7 +156,9 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return chatJsonResponse("Your session expired. Please log in again.", 401, {
+        error: "Unauthorized",
+      });
     }
 
     const body = (await request.json()) as { message?: string; conversationId?: string };
@@ -139,22 +166,28 @@ export async function POST(request: NextRequest) {
     const requestedConversationId = body.conversationId ?? null;
 
     if (!incomingMessage) {
-      return NextResponse.json({ error: "Message is required" }, { status: 400 });
+      return chatJsonResponse("Please enter a message.", 400, {
+        error: "Message is required",
+      });
     }
 
     if (incomingMessage.length > 4000) {
-      return NextResponse.json(
-        { error: "Message too long (max 4000 characters)" },
-        { status: 400 }
-      );
+      return chatJsonResponse("Message too long. Please shorten and retry.", 400, {
+        error: "Message too long (max 4000 characters)",
+      });
     }
+    console.debug("[chat-api] validated request", {
+      userId: user.id,
+      messageLength: incomingMessage.length,
+      hasConversationId: Boolean(requestedConversationId),
+    });
 
     const aiValidation = validateAiSetup();
     if (!aiValidation.valid) {
-      return NextResponse.json(
-        { error: "LLM service not configured", details: aiValidation.error },
-        { status: 503 }
-      );
+      return chatJsonResponse(EMPTY_RESPONSE_FALLBACK, 503, {
+        error: "LLM service not configured",
+        details: aiValidation.error,
+      });
     }
 
     let activeConversationId = requestedConversationId;
@@ -169,10 +202,10 @@ export async function POST(request: NextRequest) {
         .select("id")
         .single();
       if (error || !conversation) {
-        return NextResponse.json(
-          { error: "Failed to create conversation", details: error?.message ?? "" },
-          { status: 500 }
-        );
+        return chatJsonResponse(EMPTY_RESPONSE_FALLBACK, 500, {
+          error: "Failed to create conversation",
+          details: error?.message ?? "",
+        });
       }
       activeConversationId = conversation.id;
     } else {
@@ -183,7 +216,9 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id)
         .single();
       if (error || !existing) {
-        return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+        return chatJsonResponse("Conversation not found.", 404, {
+          error: "Conversation not found",
+        });
       }
     }
 
@@ -193,10 +228,10 @@ export async function POST(request: NextRequest) {
       content: incomingMessage,
     });
     if (userMessageError) {
-      return NextResponse.json(
-        { error: "Failed to save message", details: userMessageError.message },
-        { status: 500 }
-      );
+      return chatJsonResponse(EMPTY_RESPONSE_FALLBACK, 500, {
+        error: "Failed to save message",
+        details: userMessageError.message,
+      });
     }
 
     const { data: historyRows } = await supabase
@@ -219,8 +254,13 @@ export async function POST(request: NextRequest) {
     let chatMode: "stock" | "general" = "general";
 
     const stockQuery = detectStockQuery(incomingMessage);
+    console.debug("[chat-api] stock detection", { stockQuery: stockQuery ?? null });
     if (stockQuery) {
       const resolvedSymbol = await withTimeout(resolveSymbol(stockQuery), 7000, "resolveSymbol");
+      console.debug("[chat-api] symbol resolution", {
+        query: stockQuery,
+        symbol: resolvedSymbol ?? null,
+      });
       if (resolvedSymbol) {
         try {
           const quote = await withTimeout(fetchQuote(resolvedSymbol), 9000, "fetchQuote");
@@ -256,7 +296,13 @@ export async function POST(request: NextRequest) {
             companyInfo,
           };
           chatMode = "stock";
+          console.debug("[chat-api] stock analysis ready", {
+            symbol: resolvedSymbol,
+            historyPoints: history.length,
+            newsCount: news.length,
+          });
         } catch (stockError) {
+          console.error("[chat-api] stock enrichment failed", stockError);
           llmMessage = `${incomingMessage}\n\nNote: Live stock lookup for "${resolvedSymbol}" failed (${stockError instanceof Error ? stockError.message : String(stockError)}). Explain this briefly, then continue with a useful text-only analysis.`;
         }
       }
@@ -266,6 +312,7 @@ export async function POST(request: NextRequest) {
 
     let llmStream: ReadableStream<Uint8Array>;
     try {
+      console.debug("[chat-api] opening LLM stream", { mode: chatMode });
       llmStream = await withTimeout(
         streamChat({
           mode: chatMode,
@@ -298,9 +345,14 @@ export async function POST(request: NextRequest) {
       persisted = true;
 
       let fullResponse = chunks.join("");
-      if (fullResponse.trim().length === 0) {
+      if (!hasVisibleText(fullResponse)) {
         fullResponse = EMPTY_RESPONSE_FALLBACK;
       }
+      console.debug("[chat-api] persisting assistant response", {
+        conversationId,
+        chars: fullResponse.length,
+        visible: hasVisibleText(fullResponse),
+      });
 
       const metadata = buildStockMetadata(stockAnalysis);
 
@@ -320,24 +372,33 @@ export async function POST(request: NextRequest) {
     const outboundStream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const reader = timedStream.getReader();
+        let chunkCount = 0;
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             if (!value) continue;
             const text = decoder.decode(value, { stream: true });
-            if (text) chunks.push(text);
+            if (text) {
+              chunks.push(text);
+              chunkCount++;
+            }
             controller.enqueue(value);
           }
         } catch {
           // Stream failure falls back below.
         } finally {
           reader.releaseLock();
-          if (chunks.join("").trim().length === 0) {
+          if (!hasVisibleText(chunks.join(""))) {
             chunks.push(EMPTY_RESPONSE_FALLBACK);
             controller.enqueue(encoder.encode(EMPTY_RESPONSE_FALLBACK));
           }
           controller.close();
+          console.debug("[chat-api] stream finished", {
+            conversationId,
+            chunks: chunkCount,
+            totalChars: chunks.join("").length,
+          });
           persistAssistantMessage().catch((error) =>
             console.error("CHAT ERROR:", error)
           );
@@ -365,9 +426,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("CHAT ERROR:", error);
     const details = error instanceof Error ? error.message : String(error);
-    return NextResponse.json(
-      { error: "Internal error", details },
-      { status: 500 }
-    );
+    return chatJsonResponse(EMPTY_RESPONSE_FALLBACK, 500, {
+      error: "Internal error",
+      details,
+    });
   }
 }
