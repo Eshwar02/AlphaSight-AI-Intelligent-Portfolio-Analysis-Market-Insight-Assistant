@@ -368,17 +368,25 @@ export async function generateResponse(
 export async function streamStockAnalysis(
   message: string,
   analysis: StockAnalysis,
-  conversationHistory: Array<{ role: ChatRole; content: string }>
+  conversationHistory: Array<{ role: ChatRole; content: string }>,
+  userMemory?: string
 ): Promise<ReadableStream<Uint8Array>> {
   const stockContext = buildStockContext(analysis);
+  const systemPrompt = [
+    STOCK_ANALYSIS_SYSTEM_PROMPT,
+    stockContext,
+    userMemory,
+  ]
+    .filter(Boolean)
+    .join("\n\n---\n\n");
   const stream = await generateResponse(message, {
-    systemPrompt: `${STOCK_ANALYSIS_SYSTEM_PROMPT}\n\n---\n\n${stockContext}`,
+    systemPrompt,
     history: conversationHistory,
     model: STOCK_ANALYSIS_MODEL,
     stream: true,
     temperature: 0.6,
-    maxTokens: 1500,
-    timeoutMs: 45_000,
+    maxTokens: 4096,
+    timeoutMs: 60_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;
 }
@@ -386,16 +394,21 @@ export async function streamStockAnalysis(
 export async function streamGeneralChat(
   message: string,
   conversationHistory: Array<{ role: ChatRole; content: string }>,
-  kind: "brief" | "normal" = "normal"
+  kind: "brief" | "normal" = "normal",
+  userMemory?: string
 ): Promise<ReadableStream<Uint8Array>> {
+  const basePrompt = GENERAL_CHAT_PROMPT;
+  const systemPrompt = userMemory
+    ? `${basePrompt}\n\n---\n\n${userMemory}`
+    : basePrompt;
   const stream = await generateResponse(message, {
-    systemPrompt: GENERAL_CHAT_PROMPT,
+    systemPrompt,
     history: conversationHistory,
     model: GENERAL_CHAT_MODEL,
     stream: true,
     temperature: kind === "brief" ? 0.8 : 0.6,
-    maxTokens: kind === "brief" ? 140 : 800,
-    timeoutMs: 45_000,
+    maxTokens: kind === "brief" ? 140 : 2048,
+    timeoutMs: 60_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;
 }
@@ -407,8 +420,8 @@ export async function generateDailyBrief(prompt: string): Promise<string> {
       model: DAILY_BRIEF_MODEL,
       stream: false,
       temperature: 0.6,
-      maxTokens: 700,
-      timeoutMs: 35_000,
+      maxTokens: 1500,
+      timeoutMs: 45_000,
     });
     return typeof result === "string" ? result : "";
   } catch (error) {

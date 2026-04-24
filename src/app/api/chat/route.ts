@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { classifyIntent, streamChat, validateAiSetup } from "@/lib/ai";
+import { buildUserContext } from "@/lib/ai/user-context";
 import { resolveSymbol } from "@/lib/stock/symbols";
 import { fetchQuote, fetchHistory, fetchCompanyInfo } from "@/lib/stock/data";
 import { fetchStockNews } from "@/lib/stock/news";
@@ -268,13 +269,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { data: historyRows } = await supabase
-      .from("messages")
-      .select("role, content")
-      .eq("conversation_id", activeConversationId)
-      .order("created_at", { ascending: true })
-      .limit(10);
+    const [historyResponse, userMemory] = await Promise.all([
+      supabase
+        .from("messages")
+        .select("role, content")
+        .eq("conversation_id", activeConversationId)
+        .order("created_at", { ascending: true })
+        .limit(10),
+      buildUserContext(supabase, user.id).catch((err) => {
+        console.warn("[chat-api] buildUserContext failed", err);
+        return "";
+      }),
+    ]);
 
+    const historyRows = historyResponse.data;
     const conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = (
       historyRows || []
     )
@@ -404,8 +412,9 @@ export async function POST(request: NextRequest) {
           analysis: stockAnalysis ?? undefined,
           kind: generalKind,
           model: requestedModel,
+          userMemory: userMemory || undefined,
         }),
-        45_000,
+        60_000,
         "streamChat"
       );
     } catch (llmError) {

@@ -68,12 +68,12 @@ export function Header() {
   }, [router, setActiveView]);
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-dark-800/80 bg-dark-900/80 px-3 backdrop-blur">
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white/80 px-3 backdrop-blur dark:border-dark-800/80 dark:bg-dark-900/80">
       {/* ── Left: sidebar toggle + back ──────── */}
       <div className="flex items-center gap-1">
         <button
           onClick={toggleSidebar}
-          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-dark-850 hover:text-gray-100"
+          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-dark-850 dark:hover:text-gray-100"
           aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
         >
           <Menu size={17} />
@@ -81,7 +81,7 @@ export function Header() {
         {pathname !== '/' && (
           <button
             onClick={handleBack}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-dark-850 hover:text-gray-100"
+            className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-dark-850 dark:hover:text-gray-100"
             aria-label="Go back"
           >
             <ArrowLeft size={17} />
@@ -95,7 +95,7 @@ export function Header() {
           setActiveView('chat');
           router.push('/');
         }}
-        className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-gray-300 transition-colors hover:bg-dark-850 hover:text-gray-100"
+        className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-dark-850 dark:hover:text-gray-100"
         aria-label="Go to chat home"
       >
         <Image src="/logo.svg" alt="AlphaSight" width={14} height={14} />
@@ -122,9 +122,9 @@ export function Header() {
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-xl border border-dark-800 bg-dark-900 py-1 shadow-2xl shadow-black/40">
+            <div className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-2xl shadow-black/10 dark:border-dark-800 dark:bg-dark-900 dark:shadow-black/40">
               <button
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-gray-300 transition-colors hover:bg-dark-850"
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-850"
                 onClick={() => {
                   setMenuOpen(false);
                   setActiveView('settings');
@@ -134,9 +134,9 @@ export function Header() {
                 <User size={14} />
                 <span>Profile</span>
               </button>
-              <div className="my-1 border-t border-dark-800" />
+              <div className="my-1 border-t border-gray-200 dark:border-dark-800" />
               <button
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 transition-colors hover:bg-dark-850"
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-red-500 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-dark-850"
                 onClick={() => void handleSignOut()}
               >
                 <LogOut size={14} />

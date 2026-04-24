@@ -142,18 +142,18 @@ export function Sidebar() {
   );
 
   const sidebarContent = (
-    <div className="flex h-full flex-col bg-dark-950 text-sm">
+    <div className="flex h-full flex-col bg-gray-50 text-sm dark:bg-dark-950">
       {/* ── Brand row ────────────────────────── */}
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <div className="flex items-center gap-2 px-1">
           <Image src="/logo.svg" alt="AlphaSight" width={20} height={20} />
-          <span className="text-[13px] font-semibold tracking-tight text-gray-100">
+          <span className="text-[13px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             AlphaSight
           </span>
         </div>
         <button
           onClick={toggleSidebar}
-          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-dark-900 hover:text-gray-200"
+          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-900 dark:hover:text-gray-200"
           aria-label="Close sidebar"
         >
           <ChevronLeft size={16} />
@@ -166,9 +166,9 @@ export function Sidebar() {
           onClick={handleNewChat}
           className={cn(
             'flex w-full items-center gap-2 rounded-lg px-3 py-2',
-            'border border-dark-800 bg-dark-900/60 text-[13px] font-medium text-gray-200',
+            'border border-gray-200 bg-white text-[13px] font-medium text-gray-900 dark:border-dark-800 dark:bg-dark-900/60 dark:text-gray-200',
             'transition-all duration-150',
-            'hover:border-accent-brand/40 hover:bg-dark-900 hover:text-gray-50',
+            'hover:border-accent-brand/40 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-900 dark:hover:text-gray-50',
           )}
         >
           <Plus size={15} strokeWidth={2} />
@@ -177,7 +177,7 @@ export function Sidebar() {
       </div>
 
       {/* ── Chat history ─────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-dark-800">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 dark:scrollbar-thumb-dark-800">
         {grouped.length === 0 && (
           <p className="px-3 py-8 text-center text-xs text-dark-500">
             No conversations yet
@@ -197,8 +197,8 @@ export function Sidebar() {
                     'group relative flex cursor-pointer items-center rounded-lg px-3 py-1.5',
                     'transition-colors duration-100',
                     isActive
-                      ? 'bg-dark-850 text-gray-50'
-                      : 'text-gray-400 hover:bg-dark-900 hover:text-gray-200',
+                      ? 'bg-gray-100 text-gray-900 dark:bg-dark-850 dark:text-gray-50'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-dark-900 dark:hover:text-gray-200',
                   )}
                   onClick={() => handleSelectChat(conv.id)}
                 >
@@ -209,7 +209,7 @@ export function Sidebar() {
                     size={13}
                     className={cn(
                       'mr-2.5 shrink-0',
-                      isActive ? 'text-accent-brand' : 'text-dark-500',
+                      isActive ? 'text-accent-brand' : 'text-gray-400 dark:text-dark-500',
                     )}
                   />
                   <span className="flex-1 truncate text-[13px]">{conv.title}</span>
@@ -218,7 +218,7 @@ export function Sidebar() {
                       e.stopPropagation();
                       void handleDeleteConversation(conv.id);
                     }}
-                    className="ml-1 hidden shrink-0 rounded p-1 text-dark-500 transition-colors hover:bg-dark-800 hover:text-red-400 group-hover:block"
+                    className="ml-1 hidden shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-red-500 group-hover:block dark:text-dark-500 dark:hover:bg-dark-800 dark:hover:text-red-400"
                     aria-label="Delete conversation"
                   >
                     <Trash2 size={13} />
