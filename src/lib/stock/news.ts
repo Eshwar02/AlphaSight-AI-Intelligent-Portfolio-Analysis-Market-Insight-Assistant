@@ -232,45 +232,45 @@ export async function fetchStockNews(
     newsItems.push(...thematic);
   }
 
-  // Strategy 1: Search by ticker symbol
-  try {
-    const searchResult = await yahoo.search(symbol, {
-      newsCount: 10,
-      quotesCount: 0,
-    });
+  // Strategy 1: Search by ticker symbol - disabled to prioritize real-time APIs
+  // try {
+  //   const searchResult = await yahoo.search(symbol, {
+  //     newsCount: 10,
+  //     quotesCount: 0,
+  //   });
 
-    if (searchResult.news && searchResult.news.length > 0) {
-      for (const item of searchResult.news) {
-        newsItems.push(mapNewsItem(item));
-      }
-    }
-  } catch (error) {
-    console.error(
-      `[fetchStockNews] Search by symbol failed for ${symbol}:`,
-      error instanceof Error ? error.message : error
-    );
-  }
+  //   if (searchResult.news && searchResult.news.length > 0) {
+  //     for (const item of searchResult.news) {
+  //       newsItems.push(mapNewsItem(item));
+  //     }
+  //   }
+  // } catch (error) {
+  //   console.error(
+  //     `[fetchStockNews] Search by symbol failed for ${symbol}:`,
+  //     error instanceof Error ? error.message : error
+  //   );
+  // }
 
-  // Strategy 2: If too few results, also try searching by company name
-  if (newsItems.length < 3 && companyName) {
-    try {
-      const nameSearch = await yahoo.search(companyName, {
-        newsCount: 10,
-        quotesCount: 0,
-      });
+  // Strategy 2: If too few results, also try searching by company name - disabled
+  // if (newsItems.length < 3 && companyName) {
+  //   try {
+  //     const nameSearch = await yahoo.search(companyName, {
+  //       newsCount: 10,
+  //       quotesCount: 0,
+  //     });
 
-      if (nameSearch.news && nameSearch.news.length > 0) {
-        for (const item of nameSearch.news) {
-          newsItems.push(mapNewsItem(item));
-        }
-      }
-    } catch (error) {
-      console.error(
-        `[fetchStockNews] Search by name failed for ${companyName}:`,
-        error instanceof Error ? error.message : error
-      );
-    }
-  }
+  //   if (nameSearch.news && nameSearch.news.length > 0) {
+  //     for (const item of nameSearch.news) {
+  //       newsItems.push(mapNewsItem(item));
+  //     }
+  //   }
+  // } catch (error) {
+  //   console.error(
+  //     `[fetchStockNews] Search by name failed for ${companyName}:`,
+  //     error instanceof Error ? error.message : error
+  //   );
+  // }
+  // }
 
   if (newsItems.length === 0) return [];
 

@@ -105,11 +105,19 @@ export interface PortfolioSnapshotItem {
   pnlPercent: number;
 }
 
+export interface MarketIndex {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+}
+
 export interface PortfolioSnapshot {
   holdings: PortfolioSnapshotItem[];
   totalValue: number;
   totalPnl: number;
   totalPnlPercent: number;
+  marketIndices?: MarketIndex[];
 }
 
 export interface DailyBrief extends Omit<DailyBriefRow, "portfolio_snapshot"> {

@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
         .select("role, content")
         .eq("conversation_id", activeConversationId)
         .order("created_at", { ascending: true })
-        .limit(10),
+        .limit(20),
       buildUserContext(supabase, user.id).catch((err) => {
         console.warn("[chat-api] buildUserContext failed", err);
         return "";
@@ -341,7 +341,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (stockQuery) {
-      const resolvedSymbol = await withTimeout(resolveSymbol(stockQuery), 7000, "resolveSymbol");
+      const resolvedSymbol = await withTimeout(resolveSymbol(stockQuery), 15000, "resolveSymbol");
       console.debug("[chat-api] symbol resolution", {
         query: stockQuery,
         symbol: resolvedSymbol ?? null,
@@ -354,13 +354,13 @@ export async function POST(request: NextRequest) {
       }
       if (resolvedSymbol) {
         try {
-          const quote = await withTimeout(fetchQuote(resolvedSymbol), 9000, "fetchQuote");
+          const quote = await withTimeout(fetchQuote(resolvedSymbol), 20000, "fetchQuote");
           if (!quote) throw new Error("Quote not found");
 
           const [historyResult, companyInfoResult, newsResult] = await Promise.allSettled([
-            withTimeout(fetchHistory(resolvedSymbol, 3), 12000, "fetchHistory"),
-            withTimeout(fetchCompanyInfo(resolvedSymbol), 9000, "fetchCompanyInfo"),
-            withTimeout(fetchStockNews(resolvedSymbol), 9000, "fetchStockNews"),
+            withTimeout(fetchHistory(resolvedSymbol, 3), 25000, "fetchHistory"),
+            withTimeout(fetchCompanyInfo(resolvedSymbol), 20000, "fetchCompanyInfo"),
+            withTimeout(fetchStockNews(resolvedSymbol), 20000, "fetchStockNews"),
           ]);
 
           const history = historyResult.status === "fulfilled" ? historyResult.value : [];
@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
           model: requestedModel,
           userMemory: userMemory || undefined,
         }),
-        60_000,
+        120_000,
         "streamChat"
       );
     } catch (llmError) {
@@ -428,7 +428,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const timedStream = withStreamTimeout(llmStream, 45_000);
+    const timedStream = withStreamTimeout(llmStream, 90_000);
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
     const chunks: string[] = [];

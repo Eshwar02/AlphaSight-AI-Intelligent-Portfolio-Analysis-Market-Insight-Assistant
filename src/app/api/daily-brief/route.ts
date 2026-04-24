@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchQuote } from "@/lib/stock/data";
 import { assessMacroRisks } from "@/lib/stock/macro";
+import { fetchStockNews } from "@/lib/stock/news";
 import { generateDailyBrief } from "@/lib/ai";
 import type { PortfolioSnapshot, PortfolioSnapshotItem } from "@/types/stock";
 // Types
@@ -114,6 +115,26 @@ async function generateBriefForUser(
 
   const snapshot = await buildPortfolioSnapshot(holdings);
 
+  // Fetch market indices
+  const indices = ['^GSPC', '^IXIC', '^DJI'];
+  const marketIndices: Array<{ symbol: string; price: number; change: number; changePercent: number }> = [];
+  for (const symbol of indices) {
+    try {
+      const quote = await fetchQuote(symbol);
+      if (quote) {
+        marketIndices.push({
+          symbol: quote.symbol === '^GSPC' ? 'S&P 500' : quote.symbol === '^IXIC' ? 'NASDAQ' : 'Dow Jones',
+          price: quote.price,
+          change: quote.change,
+          changePercent: quote.changePercent,
+        });
+      }
+    } catch {
+      // Skip failed indices
+    }
+  }
+  snapshot.marketIndices = marketIndices;
+
   // Sort by P&L for top movers
   const sorted = [...snapshot.holdings].sort(
     (a, b) => Math.abs(b.pnlPercent) - Math.abs(a.pnlPercent)
@@ -131,17 +152,48 @@ async function generateBriefForUser(
     "United States"
   );
 
-  // Build prompt for AI
-  let prompt = `Generate a daily portfolio briefing for the user.\n\n`;
-  prompt += `## Portfolio Overview\n`;
+  // Fetch market indices
+  const marketSymbols = ['^GSPC', '^IXIC', '^DJI']; // S&P 500, NASDAQ, Dow Jones
+  const indexData: Array<{ symbol: string; price: number; change: number; changePercent: number }> = [];
+  for (const symbol of marketSymbols) {
+    try {
+      const quote = await fetchQuote(symbol);
+      if (quote) {
+        indexData.push({
+          symbol: quote.symbol === '^GSPC' ? 'S&P 500' : quote.symbol === '^IXIC' ? 'NASDAQ' : 'Dow Jones',
+          price: quote.price,
+          change: quote.change,
+          changePercent: quote.changePercent,
+        });
+      }
+    } catch {
+      // Skip failed indices
+    }
+  }
+
+  // Fetch recent market news
+  let marketNews = '';
+  try {
+    const news = await fetchStockNews('market', 'global market', []);
+    if (news.length > 0) {
+      marketNews = news.slice(0, 3).map(n => `- ${n.title} (${n.source})`).join('\n');
+    }
+  } catch {
+    marketNews = 'Market news unavailable';
+  }
+
+  // Build comprehensive prompt for AI
+  let prompt = `Generate a professional-grade daily portfolio brief for the user.\n\n`;
+
+  prompt += `## Portfolio Data\n`;
   prompt += `- Total Value: $${snapshot.totalValue.toFixed(2)}\n`;
   prompt += `- Total P&L: $${snapshot.totalPnl.toFixed(2)} (${snapshot.totalPnlPercent.toFixed(2)}%)\n`;
-  prompt += `- Holdings: ${snapshot.holdings.length}\n\n`;
+  prompt += `- Number of Holdings: ${snapshot.holdings.length}\n\n`;
 
   if (topGainers.length > 0) {
     prompt += `## Top Gainers\n`;
     for (const g of topGainers) {
-      prompt += `- ${g.symbol}: $${g.currentPrice.toFixed(2)} (${g.pnlPercent >= 0 ? "+" : ""}${g.pnlPercent.toFixed(2)}%)\n`;
+      prompt += `- ${g.symbol}: Current $${g.currentPrice.toFixed(2)}, P&L ${g.pnlPercent >= 0 ? "+" : ""}${g.pnlPercent.toFixed(2)}%\n`;
     }
     prompt += "\n";
   }
@@ -149,18 +201,27 @@ async function generateBriefForUser(
   if (topLosers.length > 0) {
     prompt += `## Top Losers\n`;
     for (const l of topLosers) {
-      prompt += `- ${l.symbol}: $${l.currentPrice.toFixed(2)} (${l.pnlPercent.toFixed(2)}%)\n`;
+      prompt += `- ${l.symbol}: Current $${l.currentPrice.toFixed(2)}, P&L ${l.pnlPercent.toFixed(2)}%\n`;
     }
     prompt += "\n";
   }
 
-  prompt += `## All Holdings\n`;
+  prompt += `## Detailed Holdings\n`;
   for (const h of snapshot.holdings) {
-    prompt += `- ${h.symbol}: ${h.quantity} shares @ avg $${h.avgBuyPrice.toFixed(2)}, now $${h.currentPrice.toFixed(2)}, P&L: $${h.pnl.toFixed(2)} (${h.pnlPercent.toFixed(2)}%)\n`;
+    prompt += `- ${h.symbol}: ${h.quantity} shares @ avg $${h.avgBuyPrice.toFixed(2)}, current $${h.currentPrice.toFixed(2)}, P&L $${h.pnl.toFixed(2)} (${h.pnlPercent.toFixed(2)}%)\n`;
   }
   prompt += "\n";
 
-  prompt += `## Key Macro Risks\n`;
+  prompt += `## Market Indices\n`;
+  for (const idx of indexData) {
+    prompt += `- ${idx.symbol}: $${idx.price.toFixed(2)} (${idx.change >= 0 ? "+" : ""}$${idx.change.toFixed(2)}, ${idx.changePercent >= 0 ? "+" : ""}${idx.changePercent.toFixed(2)}%)\n`;
+  }
+  prompt += "\n";
+
+  prompt += `## Recent Market News\n`;
+  prompt += `${marketNews}\n\n`;
+
+  prompt += `## Macro Risks\n`;
   for (const risk of macroRisks) {
     prompt += `- ${risk}\n`;
   }

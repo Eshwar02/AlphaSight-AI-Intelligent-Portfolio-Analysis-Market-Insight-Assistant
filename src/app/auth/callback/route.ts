@@ -4,7 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const redirect = searchParams.get("redirect") || "/";
+  const rawRedirect = searchParams.get("redirect") || "/";
+  // Whitelist: must start with / and not be external URL
+  const redirect =
+    typeof rawRedirect === "string" &&
+    rawRedirect.startsWith("/") &&
+    !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : "/";
 
   // Handle auth callback
   if (code) {

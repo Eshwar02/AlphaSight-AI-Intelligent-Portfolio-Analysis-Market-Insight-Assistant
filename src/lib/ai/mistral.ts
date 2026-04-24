@@ -1,14 +1,13 @@
-import {
-  DAILY_BRIEF_PROMPT,
-  GENERAL_CHAT_PROMPT,
-  STOCK_ANALYSIS_SYSTEM_PROMPT,
-} from "./prompts";
+import { STOCK_ANALYSIS_SYSTEM_PROMPT as SYSTEM_PROMPT } from "./prompts";
 import type { StockAnalysis } from "@/types/stock";
 
 const STOCK_ANALYSIS_MODEL = "mistral-large-latest";
 const GENERAL_CHAT_MODEL = "mistral-small-latest";
 const DAILY_BRIEF_MODEL = "mistral-large-latest";
 const MISTRAL_ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
+const STOCK_ANALYSIS_SYSTEM_PROMPT = SYSTEM_PROMPT;
+const GENERAL_CHAT_PROMPT = SYSTEM_PROMPT;
+const DAILY_BRIEF_PROMPT = SYSTEM_PROMPT;
 
 const MAX_RETRIES = 1;
 
@@ -75,7 +74,7 @@ function buildMessages(
   latestPrompt: string,
   history: Array<{ role: ChatRole; content: string }>
 ): MistralMessage[] {
-  const trimmedHistory = history.slice(-4).map((m) => {
+  const trimmedHistory = history.slice(-8).map((m) => {
     const content =
       m.content.length > HISTORY_MSG_CHAR_CAP
         ? m.content.slice(0, HISTORY_MSG_CHAR_CAP) + " …[truncated]"
@@ -320,7 +319,7 @@ function buildStockContext(analysis: StockAnalysis): string {
   if (news.length > 0) {
     context += `### Recent News (${news.length} items)\n`;
     for (const item of news.slice(0, 8)) {
-      context += `- ${item.title} — ${item.source} (${item.publishedAt.split("T")[0]})\n`;
+      context += `- ${item.title} — ${item.source} (${item.publishedAt.split("T")[0]}) [${item.url}]\n`;
     }
     context += "\n";
   }
@@ -385,8 +384,8 @@ export async function streamStockAnalysis(
     model: STOCK_ANALYSIS_MODEL,
     stream: true,
     temperature: 0.6,
-    maxTokens: 4096,
-    timeoutMs: 60_000,
+    maxTokens: 8192,
+    timeoutMs: 120_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;
 }
@@ -407,8 +406,8 @@ export async function streamGeneralChat(
     model: GENERAL_CHAT_MODEL,
     stream: true,
     temperature: kind === "brief" ? 0.8 : 0.6,
-    maxTokens: kind === "brief" ? 140 : 2048,
-    timeoutMs: 60_000,
+    maxTokens: kind === "brief" ? 140 : 4096,
+    timeoutMs: 120_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;
 }
@@ -420,8 +419,8 @@ export async function generateDailyBrief(prompt: string): Promise<string> {
       model: DAILY_BRIEF_MODEL,
       stream: false,
       temperature: 0.6,
-      maxTokens: 1500,
-      timeoutMs: 45_000,
+      maxTokens: 3000,
+      timeoutMs: 90_000,
     });
     return typeof result === "string" ? result : "";
   } catch (error) {

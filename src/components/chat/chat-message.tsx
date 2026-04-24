@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { ThumbsUp, ThumbsDown, Share, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MarkdownRenderer } from './markdown-renderer';
 import type { ChatMessage as ChatMessageType } from '@/stores/app-store';
 
 interface ChatMessageProps {
@@ -26,6 +28,30 @@ function AssistantMark() {
   );
 }
 
+function ShareButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-400 hover:bg-dark-800 hover:text-gray-200"
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Share className="h-3 w-3" />}
+      {copied ? 'Copied' : 'Share'}
+    </button>
+  );
+}
+
 function StreamingDots() {
   return (
     <div className="flex items-center gap-1.5 py-2">
@@ -37,6 +63,7 @@ function StreamingDots() {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
+  const [feedback, setFeedback] = useState<'good' | 'poor' | null>(null);
   const isUser = message.role === 'user';
   const isStreaming = message.isStreaming;
   const normalizedContent = useMemo(
@@ -45,6 +72,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
         .replace(/[\u200B-\u200D\uFEFF]/g, '')
         .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ''),
     [message.content],
+  );
+
+  const streamingContent = useMemo(
+    () => normalizedContent.replace(/\*\*/g, '').replace(/^#+\s*/gm, ''),
+    [normalizedContent],
   );
 
   // Count text that would actually render visibly. During streaming, the LLM
@@ -103,19 +135,61 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="min-w-0 flex-1">
             {/* Body */}
             {isStreaming && hasStreamingText && (
-              <div className="whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-200">
-                {normalizedContent}
+              <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-gray-200">
+                {streamingContent}
               </div>
             )}
             {!isStreaming && hasContent && (
-              <div className="whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-200">
-                {normalizedContent}
+              <MarkdownRenderer content={normalizedContent} />
+            )}
+            {!isStreaming && hasContent && (
+              <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-gray-200">
+                {normalizedContent.split('\n').map((line, i) => {
+                  const trimmed = line.trim();
+                  const isHeading = trimmed && trimmed === trimmed.toUpperCase() && trimmed.length > 3;
+                  return (
+                    <div key={i} className={isHeading ? 'font-bold text-xl mb-3 mt-5 uppercase' : 'mb-1'}>
+                      {line || '\u00A0'}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {!hasStreamingText && isStreaming && <StreamingDots />}
             {!hasContent && !isStreaming && (
               <div className="text-[15px] leading-7 text-gray-400 italic">
                 {EMPTY_RESPONSE_FALLBACK}
+              </div>
+            )}
+
+            {/* Feedback buttons for assistant messages */}
+            {!isUser && !isStreaming && hasContent && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setFeedback('good')}
+                  className={cn(
+                    'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+                    feedback === 'good'
+                      ? 'bg-accent-brand text-dark-950'
+                      : 'text-gray-400 hover:bg-dark-800 hover:text-gray-200'
+                  )}
+                >
+                  <ThumbsUp className="h-3 w-3" />
+                  Good
+                </button>
+                <button
+                  onClick={() => setFeedback('poor')}
+                  className={cn(
+                    'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+                    feedback === 'poor'
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-400 hover:bg-dark-800 hover:text-gray-200'
+                  )}
+                >
+                  <ThumbsDown className="h-3 w-3" />
+                  Poor
+                </button>
+                <ShareButton content={normalizedContent} />
               </div>
             )}
 
