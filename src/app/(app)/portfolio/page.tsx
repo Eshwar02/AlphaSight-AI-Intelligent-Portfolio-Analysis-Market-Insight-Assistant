@@ -534,7 +534,7 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex-1 min-w-0 py-3 px-4 text-sm font-medium transition-colors whitespace-nowrap',
+                'py-3 px-4 text-sm font-medium transition-colors whitespace-nowrap min-w-max',
                 activeTab === tab.id ? 'text-accent-green border-b-2 border-accent-green bg-dark-850' : 'text-gray-400 hover:text-gray-200 hover:bg-dark-850'
               )}
             >
