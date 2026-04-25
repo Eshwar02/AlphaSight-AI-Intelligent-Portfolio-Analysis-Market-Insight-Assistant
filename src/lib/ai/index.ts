@@ -13,13 +13,6 @@ import {
   friendlyGroqError,
   generateDailyBrief as groqGenerateDailyBrief,
 } from "./groq";
-import {
-  streamStockAnalysis as geminiStockStream,
-  streamGeneralChat as geminiGeneralStream,
-  validateGeminiSetup,
-  friendlyGeminiError,
-  generateDailyBrief as geminiGenerateDailyBrief,
-} from "./gemini";
 
 type ChatRole = "user" | "assistant";
 type ChatHistory = Array<{ role: ChatRole; content: string }>;
@@ -40,16 +33,15 @@ export function validateAiSetup(): {
   valid: boolean;
   error?: string;
   stockPrimary: "mistral" | "groq" | "none";
-  generalPrimary: "gemini" | "groq" | "mistral" | "none";
-  fallback: "groq" | "mistral" | "gemini" | "none";
+  generalPrimary: "groq" | "mistral" | "none";
+  fallback: "groq" | "mistral" | "none";
 } {
   const mistral = validateMistralSetup();
   const groq = validateGroqSetup();
-  const gemini = validateGeminiSetup();
 
   const stockPrimary = mistral.valid ? "mistral" : groq.valid ? "groq" : "none";
-  const generalPrimary = gemini.valid ? "gemini" : groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
-  const fallback = groq.valid ? "groq" : mistral.valid ? "mistral" : gemini.valid ? "gemini" : "none";
+  const generalPrimary = groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
+  const fallback = groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
 
   const valid = stockPrimary !== "none" && generalPrimary !== "none";
 
@@ -59,7 +51,7 @@ export function validateAiSetup(): {
       stockPrimary: "none",
       generalPrimary: "none",
       fallback: "none",
-      error: `No LLM configured. Mistral: ${mistral.error}, Groq: ${groq.error}, Gemini: ${gemini.error}`,
+      error: `No LLM configured. Mistral: ${mistral.error}, Groq: ${groq.error}`,
     };
   }
 
@@ -106,14 +98,7 @@ export async function streamChat(
           continue;
         }
       } else {
-        if (provider === "gemini") {
-          stream = await geminiGeneralStream(
-            args.message,
-            args.history,
-            args.kind ?? "normal",
-            args.userMemory
-          );
-        } else if (provider === "groq") {
+        if (provider === "groq") {
           stream = await groqGeneralStream(
             args.message,
             args.history,
