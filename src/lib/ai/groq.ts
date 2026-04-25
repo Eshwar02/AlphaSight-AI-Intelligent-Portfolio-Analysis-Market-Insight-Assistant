@@ -29,7 +29,7 @@ export async function generateGroqResponse(
 
   const groq = new Groq({ apiKey });
 
-  const messages = [
+  const messages: any = [
     { role: "system", content: context.systemPrompt },
     ...(context.history || []).map(h => ({
       role: h.role as "user" | "assistant",

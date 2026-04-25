@@ -1,4 +1,4 @@
-import { GoogleAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { textToStream } from './mistral'; // Reuse the stream converter
 
 const GEMINI_MODEL = "gemini-2.0-flash-exp"; // Use 2.5 flash if available, but 2.0 flash exp
@@ -27,13 +27,13 @@ export async function generateGeminiResponse(
   const apiKey = readGeminiApiKey();
   if (!apiKey) throw new Error("Gemini API key not configured");
 
-  const genAI = new GoogleAI({ apiKey });
-  const model = genAI.generativeModel(GEMINI_MODEL);
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-  const messages = [
+  const contents = [
     { role: "user", parts: [{ text: context.systemPrompt }] },
     ...(context.history || []).map(h => ({
-      role: h.role as "user" | "model",
+      role: h.role === "assistant" ? "model" : "user",
       parts: [{ text: h.content }]
     })),
     { role: "user", parts: [{ text: message }] }
@@ -45,7 +45,7 @@ export async function generateGeminiResponse(
   };
 
   const result = await model.generateContent({
-    contents: messages,
+    contents,
     generationConfig,
   });
 
