@@ -51,8 +51,10 @@ const greetings = [
 ];
 
 export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
-  const [greeting, setGreeting] = useState("Hello, how can I help you today?");
-  const [name, setName] = useState("");
+  const storedName = typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
+  const initialGreeting = storedName ? `Hello ${storedName}, ready to dive into the markets?` : "Hello, how can I help you today?";
+  const [greeting, setGreeting] = useState(initialGreeting);
+  const [name, setName] = useState(storedName || "");
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -72,7 +74,8 @@ export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
           const personalized = userName ? randomGreeting.replace('{name}', userName) : "Hello, how can I help you today?";
           setGreeting(personalized);
 
-          // Store this greeting
+          // Store name and greeting
+          if (userName) localStorage.setItem('userName', userName);
           localStorage.setItem('lastGreeting', randomGreeting);
         }
       } catch (err) {
@@ -100,19 +103,12 @@ export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.05 }}
-        className="mb-2 text-center text-3xl font-semibold tracking-tight text-gray-100 sm:text-4xl"
+        className="mb-8 text-center hero-title text-gray-100"
       >
         {greeting}
       </motion.h1>
 
-      <motion.p
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.12 }}
-        className="mb-10 max-w-md text-center text-sm text-dark-400"
-      >
-        I'm here to help with your financial questions and market insights.
-      </motion.p>
+
     </div>
   );
 }
