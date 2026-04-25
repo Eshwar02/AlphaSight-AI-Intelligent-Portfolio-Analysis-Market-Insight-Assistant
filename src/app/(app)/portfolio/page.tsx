@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createChart, ColorType, LineSeries, Time } from 'lightweight-charts';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -509,7 +509,6 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
   const tabs = [
     { id: 'summary', label: 'Summary' },
     { id: 'news', label: 'News' },
-    { id: 'chart', label: 'Chart' },
     { id: 'stats', label: 'Statistics' },
     { id: 'history', label: 'Historical' },
     { id: 'financials', label: 'Financials' },
@@ -618,14 +617,7 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
                   )}
                 </div>
               )}
-              {activeTab === 'chart' && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-100 mb-4">Price Chart</h3>
-                  <div className="h-80 bg-dark-850 rounded-lg p-4">
-                    <StockChart data={data?.history || []} />
-                  </div>
-                </div>
-              )}
+
               {/* Other tabs */}
               {['statistics', 'financials', 'analysis'].includes(activeTab) && (
                 <div className="text-center text-gray-400 py-8">
@@ -641,45 +633,7 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
 }
 
 // Stock Chart Component
-function StockChart({ data }: { data: any[] }) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<any>(null);
 
-  useEffect(() => {
-    if (!chartContainerRef.current || !data.length) return;
-
-    const chart = createChart(chartContainerRef.current as any, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#1f2937' },
-        textColor: '#d1d5db',
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: 300,
-    });
-
-    const lineSeries = chart.addSeries(LineSeries, {
-      color: '#10b981',
-      lineWidth: 2,
-    });
-
-    // Convert data to line format (using close price)
-    const lineData = data.map((d: any) => ({
-      time: Math.floor(new Date(d.date).getTime() / 1000) as Time,
-      value: d.close,
-    }));
-
-    lineSeries.setData(lineData);
-    chart.timeScale().fitContent();
-
-    chartRef.current = chart;
-
-    return () => {
-      chart.remove();
-    };
-  }, [data]);
-
-  return <div ref={chartContainerRef} className="w-full" />;
-}
 
 export default function PortfolioPage() {
   return <PortfolioView />;
