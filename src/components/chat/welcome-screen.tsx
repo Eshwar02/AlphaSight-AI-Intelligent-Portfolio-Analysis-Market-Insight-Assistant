@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { TrendingUp, BarChart3, Globe, ArrowLeftRight } from 'lucide-react';
@@ -37,7 +37,52 @@ const suggestions = [
   },
 ];
 
+const greetings = [
+  "Hello {name}, ready to dive into the markets?",
+  "Welcome back {name}, what's on your mind today?",
+  "Hey {name}, let's analyze some stocks!",
+  "Good to see you {name}, how can I assist with your portfolio?",
+  "Hi {name}, excited to help with your financial queries!",
+  "Greetings {name}, shall we explore market insights?",
+  "Hey there {name}, what's your investment question?",
+  "Welcome {name}, let's make some smart investment decisions!",
+  "Hello again {name}, ready for market analysis?",
+  "Hi {name}, let's uncover some stock opportunities!",
+];
+
 export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
+  const [greeting, setGreeting] = useState("Hello, how can I help you today?");
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch('/api/user/memory');
+        if (res.ok) {
+          const data = await res.json();
+          const userName = data.memory?.name || "";
+          setName(userName);
+
+          // Get last greeting from localStorage
+          const lastGreeting = localStorage.getItem('lastGreeting');
+          let availableGreetings = greetings.filter(g => g !== lastGreeting);
+          if (availableGreetings.length === 0) availableGreetings = greetings;
+
+          const randomGreeting = availableGreetings[Math.floor(Math.random() * availableGreetings.length)];
+          const personalized = userName ? randomGreeting.replace('{name}', userName) : "Hello, how can I help you today?";
+          setGreeting(personalized);
+
+          // Store this greeting
+          localStorage.setItem('lastGreeting', randomGreeting);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user data:', err);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 pt-16 sm:pb-16">
       {/* Brand mark */}
@@ -57,7 +102,7 @@ export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
         transition={{ duration: 0.5, delay: 0.05 }}
         className="mb-2 text-center text-3xl font-semibold tracking-tight text-gray-100 sm:text-4xl"
       >
-        How can I help you today?
+        {greeting}
       </motion.h1>
 
       <motion.p
@@ -66,57 +111,8 @@ export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
         transition={{ duration: 0.5, delay: 0.12 }}
         className="mb-10 max-w-md text-center text-sm text-dark-400"
       >
-        Institutional-grade stock research, on demand. Ask about any company, market, or portfolio.
+        I'm here to help with your financial questions and market insights.
       </motion.p>
-
-      {/* Suggestion cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="grid w-full max-w-2xl grid-cols-1 gap-2.5 sm:grid-cols-2"
-      >
-        {suggestions.map((s, i) => (
-          <motion.button
-            key={s.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.25 + i * 0.06 }}
-            onClick={() => onSendPrompt(s.prompt)}
-            className={cn(
-              'group relative flex items-start gap-3 overflow-hidden rounded-xl border p-4 text-left',
-              'border-dark-800 bg-dark-900/40 backdrop-blur-sm',
-              'transition-all duration-200',
-              'hover:border-accent-brand/40 hover:bg-dark-800/60',
-            )}
-          >
-            {/* subtle hover glow */}
-            <span
-              className={cn(
-                'pointer-events-none absolute inset-x-0 top-0 h-px',
-                'bg-gradient-to-r from-transparent via-accent-brand/40 to-transparent opacity-0',
-                'transition-opacity duration-300 group-hover:opacity-100',
-              )}
-            />
-
-            <div
-              className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                'bg-dark-800 text-dark-400 transition-colors',
-                'group-hover:bg-accent-brand-muted group-hover:text-accent-brand',
-              )}
-            >
-              <s.icon className="h-[15px] w-[15px]" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-gray-200 transition-colors group-hover:text-gray-50">
-                {s.label}
-              </div>
-              <div className="mt-0.5 text-[12px] text-dark-500">{s.description}</div>
-            </div>
-          </motion.button>
-        ))}
-      </motion.div>
     </div>
   );
 }
