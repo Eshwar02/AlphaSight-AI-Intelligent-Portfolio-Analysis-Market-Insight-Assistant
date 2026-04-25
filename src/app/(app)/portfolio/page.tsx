@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createChart, ColorType } from 'lightweight-charts';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -470,6 +471,7 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
   const [activeTab, setActiveTab] = useState('summary');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [realTimeData, setRealTimeData] = useState<any>(null);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -478,6 +480,7 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
         if (res.ok) {
           const details = await res.json();
           setData(details);
+          setRealTimeData(details.quote); // Initial
         }
       } catch (err) {
         console.error("Failed to fetch details:", err);
@@ -486,6 +489,21 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
       }
     };
     fetchDetails();
+
+    // Real-time polling every 10 seconds
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/stock/quote?symbol=${holding.symbol}`);
+        if (res.ok) {
+          const quote = await res.json();
+          setRealTimeData(quote);
+        }
+      } catch (err) {
+        console.error("Failed to fetch real-time:", err);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [holding.symbol]);
 
   const tabs = [
@@ -501,59 +519,114 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-96 bg-dark-800 border-l border-dark-700 shadow-xl transform transition-transform duration-300 ease-in-out">
       <div className="flex flex-col h-full">
-        <div className="flex justify-between items-center p-4 border-b border-dark-700">
-          <h2 className="text-lg font-bold text-gray-100">{holding.name || holding.symbol}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">✕</button>
+        <div className="sticky top-0 bg-dark-800 z-10 p-6 border-b border-dark-700">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-100">{holding.name || holding.symbol}</h1>
+              <p className="text-sm text-gray-400">{holding.symbol}</p>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-200 text-xl">✕</button>
+          </div>
         </div>
-        <div className="flex border-b border-dark-700">
+        <div className="sticky top-0 bg-dark-800 z-10 flex border-b border-dark-700 overflow-x-auto">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex-1 py-2 text-sm font-medium transition-colors',
-                activeTab === tab.id ? 'text-accent-green border-b-2 border-accent-green' : 'text-gray-400 hover:text-gray-200'
+                'flex-1 min-w-0 py-3 px-4 text-sm font-medium transition-colors whitespace-nowrap',
+                activeTab === tab.id ? 'text-accent-green border-b-2 border-accent-green bg-dark-850' : 'text-gray-400 hover:text-gray-200 hover:bg-dark-850'
               )}
             >
               {tab.label}
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {loading ? (
-            <div className="text-center text-gray-400">Loading...</div>
+            <div className="space-y-4">
+              <div className="h-8 bg-dark-700 rounded animate-pulse"></div>
+              <div className="h-4 bg-dark-700 rounded animate-pulse"></div>
+              <div className="h-32 bg-dark-700 rounded animate-pulse"></div>
+            </div>
           ) : (
             <div>
               {activeTab === 'summary' && (
-                <div className="space-y-4">
-                  {data?.quote && (
-                    <div>
-                      <p className="text-2xl font-bold text-gray-100">{formatCurrency(data.quote.price)}</p>
-                      <p className={cn('text-sm', getChangeColor(data.quote.change))}>
-                        {formatCurrency(data.quote.change)} ({formatPercent(data.quote.changePercent)})
-                      </p>
+                <div className="space-y-6">
+                  {realTimeData && (
+                    <div className="bg-dark-850 rounded-lg p-4">
+                      <div className="text-3xl font-bold text-gray-100 mb-1">
+                        {formatCurrency(realTimeData.price)}
+                      </div>
+                      <div className={cn('text-lg font-medium', getChangeColor(realTimeData.change))}>
+                        {formatCurrency(realTimeData.change)} ({formatPercent(realTimeData.changePercent)})
+                      </div>
+                      <div className="text-sm text-gray-400 mt-2">
+                        Volume: {realTimeData.volume?.toLocaleString()}
+                      </div>
                     </div>
                   )}
                   {data?.info && (
-                    <div>
-                      <p className="text-sm text-gray-300">{data.info.description?.slice(0, 200)}...</p>
-                      <div className="mt-2 space-y-1 text-xs text-gray-400">
-                        <p>Sector: {data.info.sector}</p>
-                        <p>Industry: {data.info.industry}</p>
-                        <p>Employees: {data.info.employees}</p>
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-100 mb-2">About</h3>
+                        <p className="text-sm text-gray-300 leading-relaxed">
+                          {data.info.description?.slice(0, 300)}...
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide">Sector</p>
+                          <p className="text-sm text-gray-200">{data.info.sector}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide">Industry</p>
+                          <p className="text-sm text-gray-200">{data.info.industry}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide">Employees</p>
+                          <p className="text-sm text-gray-200">{data.info.employees}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide">Market Cap</p>
+                          <p className="text-sm text-gray-200">{formatCurrency(data.quote?.marketCap)}</p>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
               )}
-              {activeTab === 'chart' && data?.history && (
-                <div className="h-64">
-                  <MiniChart data={data.history} />
+              {activeTab === 'news' && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-100 mb-4">Latest News</h3>
+                  {data?.news && data.news.length > 0 ? (
+                    <div className="space-y-4">
+                      {data.news.slice(0, 5).map((item: any, idx: number) => (
+                        <div key={idx} className="border-b border-dark-700 pb-4 last:border-b-0">
+                          <h4 className="text-sm font-medium text-gray-100 mb-1">{item.title}</h4>
+                          <p className="text-xs text-gray-400 mb-2">{item.source} • {new Date(item.publishedAt).toLocaleDateString()}</p>
+                          <p className="text-sm text-gray-300">{item.summary}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400">No recent news available.</p>
+                  )}
                 </div>
               )}
-              {/* Add other tabs as needed */}
-              {activeTab !== 'summary' && activeTab !== 'chart' && (
-                <div className="text-center text-gray-400">Content for {activeTab} coming soon.</div>
+              {activeTab === 'chart' && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-100 mb-4">Price Chart</h3>
+                  <div className="h-80 bg-dark-850 rounded-lg p-4">
+                    <StockChart data={data?.history || []} />
+                  </div>
+                </div>
+              )}
+              {/* Other tabs */}
+              {['statistics', 'financials', 'analysis'].includes(activeTab) && (
+                <div className="text-center text-gray-400 py-8">
+                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} data coming soon.
+                </div>
               )}
             </div>
           )}
@@ -561,6 +634,53 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
       </div>
     </div>
   );
+}
+
+// Stock Chart Component
+function StockChart({ data }: { data: any[] }) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!chartContainerRef.current || !data.length) return;
+
+    const chart = createChart(chartContainerRef.current as any, {
+      layout: {
+        background: { type: ColorType.Solid, color: '#1f2937' },
+        textColor: '#d1d5db',
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 300,
+    });
+
+    const candlestickSeries = (chart as any).addCandlestickSeries({
+      upColor: '#10b981',
+      downColor: '#ef4444',
+      borderVisible: false,
+      wickUpColor: '#10b981',
+      wickDownColor: '#ef4444',
+    });
+
+    // Convert data to candlestick format
+    const candlestickData = data.map((d: any) => ({
+      time: Math.floor(new Date(d.date).getTime() / 1000),
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close,
+    }));
+
+    candlestickSeries.setData(candlestickData);
+    chart.timeScale().fitContent();
+
+    chartRef.current = chart;
+
+    return () => {
+      chart.remove();
+    };
+  }, [data]);
+
+  return <div ref={chartContainerRef} className="w-full" />;
 }
 
 export default function PortfolioPage() {

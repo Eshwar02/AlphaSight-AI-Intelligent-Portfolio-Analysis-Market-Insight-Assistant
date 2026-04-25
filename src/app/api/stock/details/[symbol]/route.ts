@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchQuote, fetchHistory, fetchCompanyInfo } from "@/lib/stock/data";
+import { fetchStockNews } from "@/lib/stock/news";
 
 export async function GET(
   request: NextRequest,
@@ -12,16 +13,18 @@ export async function GET(
     }
 
     // Fetch data in parallel
-    const [quote, history, info] = await Promise.all([
+    const [quote, history, info, news] = await Promise.all([
       fetchQuote(symbol).catch(() => null),
       fetchHistory(symbol, 10, new Date("2020-01-01")).catch(() => []),
       fetchCompanyInfo(symbol).catch(() => null),
+      fetchStockNews(symbol).catch(() => []),
     ]);
 
     return NextResponse.json({
       quote,
       history,
       info,
+      news,
     });
   } catch (err) {
     console.error("Stock details error:", err);
