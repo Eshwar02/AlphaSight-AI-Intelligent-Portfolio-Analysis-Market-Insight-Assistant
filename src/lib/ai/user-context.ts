@@ -65,6 +65,7 @@ export async function buildUserContext(
   const portfolio: PortfolioRow[] = (portfolioResult.data ?? []) as PortfolioRow[];
   const watchlist: WatchlistRow[] = (watchlistResult.data ?? []) as WatchlistRow[];
   const memory: Array<{ key: string; value: string }> = (memoryResult.data ?? []) as Array<{ key: string; value: string }>;
+  console.log("[user-context] Fetched memory:", memory);
 
   if (portfolio.length === 0 && watchlist.length === 0 && memory.length === 0) {
     return "";

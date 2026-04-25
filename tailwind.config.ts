@@ -42,6 +42,21 @@ const config: Config = {
       typography: {
         DEFAULT: {
           css: {
+            '--tw-prose-body': 'theme(colors.gray.700)',
+            '--tw-prose-headings': 'theme(colors.gray.900)',
+            '--tw-prose-links': 'theme(colors.teal.600)',
+            '--tw-prose-bold': 'theme(colors.gray.900)',
+            '--tw-prose-code': 'theme(colors.teal.600)',
+            '--tw-prose-pre-bg': 'theme(colors.gray.100)',
+            '--tw-prose-pre-code': 'theme(colors.gray.900)',
+            '--tw-prose-quotes': 'theme(colors.gray.500)',
+            '--tw-prose-quote-borders': 'theme(colors.gray.300)',
+            '--tw-prose-th-borders': 'theme(colors.gray.300)',
+            '--tw-prose-td-borders': 'theme(colors.gray.200)',
+          },
+        },
+        invert: {
+          css: {
             '--tw-prose-body': '#d1d5db',
             '--tw-prose-headings': '#f3f4f6',
             '--tw-prose-links': '#2dd4bf',

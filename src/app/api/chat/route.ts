@@ -270,12 +270,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Detect and save user memory (e.g., name)
-    const nameMatch = incomingMessage.match(/(?:my name is|i am|call me)\s+([a-zA-Z\s]+)/i);
+    const nameMatch = incomingMessage.match(/(?:my name is|I am|I'm|call me)\s+([a-zA-Z\s]+)/i);
     if (nameMatch) {
       const name = nameMatch[1].trim();
-      await supabase
+      console.log("[chat-api] Saving name:", name);
+      const { error } = await supabase
         .from("user_memory")
         .upsert({ user_id: user.id, key: "name", value: name }, { onConflict: "user_id,key" });
+      if (error) console.error("[chat-api] Save name error:", error);
     }
 
     const [historyResponse, userMemory] = await Promise.all([

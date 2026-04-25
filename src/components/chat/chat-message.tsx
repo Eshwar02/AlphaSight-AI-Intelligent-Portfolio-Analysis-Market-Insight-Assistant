@@ -44,7 +44,7 @@ function ShareButton({ content }: { content: string }) {
   return (
     <button
       onClick={handleShare}
-      className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-400 hover:bg-dark-800 hover:text-gray-200"
+      className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800 hover:text-gray-900 dark:hover:text-gray-200"
     >
       {copied ? <Check className="h-3 w-3" /> : <Share className="h-3 w-3" />}
       {copied ? 'Copied' : 'Share'}
@@ -119,9 +119,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div
             className={cn(
               'max-w-[85%] whitespace-pre-wrap break-words',
-              'rounded-2xl rounded-tr-md bg-dark-800 px-4 py-2.5',
-              'text-[15px] leading-relaxed text-gray-100',
-              'border border-dark-700/60',
+              'rounded-2xl rounded-tr-md bg-blue-500 dark:bg-dark-800 px-4 py-2.5',
+              'text-[15px] leading-relaxed text-white dark:text-gray-100',
+              'border border-gray-200 dark:border-dark-700/60',
               'shadow-[0_1px_0_rgba(0,0,0,0.2)]',
             )}
           >
@@ -145,7 +145,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             )}
             {!hasStreamingText && isStreaming && <StreamingDots />}
             {!hasContent && !isStreaming && (
-              <div className="text-[15px] leading-7 text-gray-400 italic">
+              <div className="text-[15px] leading-7 text-gray-500 dark:text-gray-400 italic">
                 {EMPTY_RESPONSE_FALLBACK}
               </div>
             )}
@@ -159,7 +159,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
                     feedback === 'good'
                       ? 'bg-accent-brand text-dark-950'
-                      : 'text-gray-400 hover:bg-dark-800 hover:text-gray-200'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800 hover:text-gray-900 dark:hover:text-gray-200'
                   )}
                 >
                   <ThumbsUp className="h-3 w-3" />
@@ -171,7 +171,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     'flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
                     feedback === 'poor'
                       ? 'bg-red-600 text-white'
-                      : 'text-gray-400 hover:bg-dark-800 hover:text-gray-200'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800 hover:text-gray-900 dark:hover:text-gray-200'
                   )}
                 >
                   <ThumbsDown className="h-3 w-3" />
