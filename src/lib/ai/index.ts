@@ -48,8 +48,8 @@ export function validateAiSetup(): {
   const gemini = validateGeminiSetup();
 
   const stockPrimary = mistral.valid ? "mistral" : groq.valid ? "groq" : "none";
-  const generalPrimary = groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
-  const fallback = groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
+  const generalPrimary = gemini.valid ? "gemini" : groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
+  const fallback = groq.valid ? "groq" : mistral.valid ? "mistral" : gemini.valid ? "gemini" : "none";
 
   const valid = stockPrimary !== "none" && generalPrimary !== "none";
 
@@ -106,7 +106,14 @@ export async function streamChat(
           continue;
         }
       } else {
-        if (provider === "groq") {
+        if (provider === "gemini") {
+          stream = await geminiGeneralStream(
+            args.message,
+            args.history,
+            args.kind ?? "normal",
+            args.userMemory
+          );
+        } else if (provider === "groq") {
           stream = await groqGeneralStream(
             args.message,
             args.history,

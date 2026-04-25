@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { textToStream } from './mistral'; // Reuse the stream converter
 
-const GEMINI_MODEL = "gemini-1.5-flash"; // Stable model
+const GEMINI_MODEL = "gemini-2.0-flash-exp"; // Gemini 2.0 Flash
 
 function readGeminiApiKey(): string {
   return process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
