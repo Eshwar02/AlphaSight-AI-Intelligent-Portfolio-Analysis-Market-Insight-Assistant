@@ -130,14 +130,13 @@ async function fetchWithRetry(
 }
 
 async function generateResponse(
+  prompt: string,
   context: GenerateResponseContext
 ): Promise<ReadableStream<Uint8Array> | string> {
   const apiKey = readApiKey();
   if (!apiKey) throw new Error("GROQ_API_KEY not set");
 
-  const messages = context.history
-    ? buildMessages(context.systemPrompt, context.history[context.history.length - 1].content, context.history.slice(0, -1))
-    : [{ role: "user" as const, content: context.systemPrompt }];
+  const messages = buildMessages(context.systemPrompt, prompt, context.history ?? []);
 
   const payload = {
     model: context.model ?? "llama3-8b-8192",
@@ -191,9 +190,9 @@ P/E: ${quote.pe}
 
 Technicals:
 - RSI: ${technicals.rsi?.toFixed(2) ?? 'N/A'}
-- MACD: ${technicals.macd?.toFixed(2) ?? 'N/A'}
-- Moving Averages: 50d ${technicals.ma50?.toFixed(2)}, 200d ${technicals.ma200?.toFixed(2)}
-- Support/Resistance: ${technicals.support?.toFixed(2)} / ${technicals.resistance?.toFixed(2)}
+- MACD: ${technicals.macd?.macdLine?.toFixed(2) ?? 'N/A'}
+- Moving Averages: 20d ${technicals.sma20?.toFixed(2)}, 50d ${technicals.sma50?.toFixed(2)}
+- Trend: ${technicals.trend ?? 'N/A'}
 
 Recent News (${news.length} items):
 ${news.map(n => `- ${n.title} (${new Date(n.publishedAt).toLocaleDateString()})`).join('\n')}

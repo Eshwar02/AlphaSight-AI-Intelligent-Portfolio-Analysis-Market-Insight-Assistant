@@ -43,7 +43,7 @@ export async function buildUserContext(
   supabase: SupabaseClient,
   userId: string
 ): Promise<string> {
-  const [portfolioResult, watchlistResult] = await Promise.all([
+  const [portfolioResult, watchlistResult, memoryResult] = await Promise.all([
     supabase
       .from("portfolio_holdings")
       .select("symbol, quantity, avg_buy_price, currency, notes")
@@ -56,16 +56,27 @@ export async function buildUserContext(
       .eq("user_id", userId)
       .order("added_at", { ascending: false })
       .limit(MAX_WATCHLIST_ITEMS),
+    supabase
+      .from("user_memory")
+      .select("key, value")
+      .eq("user_id", userId),
   ]);
 
   const portfolio: PortfolioRow[] = (portfolioResult.data ?? []) as PortfolioRow[];
   const watchlist: WatchlistRow[] = (watchlistResult.data ?? []) as WatchlistRow[];
+  const memory: Array<{ key: string; value: string }> = (memoryResult.data ?? []) as Array<{ key: string; value: string }>;
 
-  if (portfolio.length === 0 && watchlist.length === 0) {
+  if (portfolio.length === 0 && watchlist.length === 0 && memory.length === 0) {
     return "";
   }
 
   const lines: string[] = ["## User Memory"];
+
+  if (memory.length > 0) {
+    for (const m of memory) {
+      lines.push(`${m.key}: ${m.value}`);
+    }
+  }
 
   if (portfolio.length > 0) {
     const holdings = portfolio
@@ -86,7 +97,7 @@ export async function buildUserContext(
   }
 
   lines.push(
-    "Use this context naturally when relevant (e.g. if user asks about their holdings, or mentions a symbol they already hold). Never invent prices or positions not listed here."
+    "Use this context naturally when relevant (e.g. if user asks about their holdings, mentions a symbol they hold, or asks about remembered info like name). Never invent prices or positions not listed here."
   );
 
   const joined = lines.join("\n");

@@ -269,6 +269,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Detect and save user memory (e.g., name)
+    const nameMatch = incomingMessage.match(/(?:my name is|i am|call me)\s+([a-zA-Z\s]+)/i);
+    if (nameMatch) {
+      const name = nameMatch[1].trim();
+      await supabase
+        .from("user_memory")
+        .upsert({ user_id: user.id, key: "name", value: name }, { onConflict: "user_id,key" });
+    }
+
     const [historyResponse, userMemory] = await Promise.all([
       supabase
         .from("messages")
@@ -440,9 +449,10 @@ export async function POST(request: NextRequest) {
     const conversationId = activeConversationId as string;
 
     let llmStream: ReadableStream<Uint8Array>;
+    let usedProvider = "unknown";
     try {
       console.debug("[chat-api] opening LLM stream", { mode: chatMode });
-      llmStream = await withTimeout(
+      const result = await withTimeout(
         streamChat({
           mode: chatMode,
           message: llmMessage,
@@ -455,6 +465,8 @@ export async function POST(request: NextRequest) {
         90_000,
         "streamChat"
       );
+      llmStream = result.stream;
+      usedProvider = result.provider;
     } catch (llmError) {
       console.error("CHAT ERROR:", llmError);
       const encoder = new TextEncoder();
@@ -487,12 +499,17 @@ export async function POST(request: NextRequest) {
       });
 
       const metadata = buildStockMetadata(stockAnalysis);
+      if (Object.keys(metadata).length > 0) {
+        metadata.provider = usedProvider;
+      } else {
+        metadata.provider = usedProvider;
+      }
 
       await supabase.from("messages").insert({
         conversation_id: conversationId,
         role: "assistant",
         content: fullResponse,
-        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+        metadata: metadata,
       });
 
       await supabase
