@@ -134,7 +134,7 @@ async function fetchWithRetry(
   throw lastError;
 }
 
-function textToStream(text: string): ReadableStream<Uint8Array> {
+export function textToStream(text: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   return new ReadableStream<Uint8Array>({
     start(controller) {

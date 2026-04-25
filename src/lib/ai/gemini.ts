@@ -1,21 +1,21 @@
-import Groq from 'groq-sdk';
+import { GoogleAI } from '@google/genai';
 import { textToStream } from './mistral'; // Reuse the stream converter
 
-const GROQ_MODEL = "llama3-8b-8192"; // Or better model, but backup
+const GEMINI_MODEL = "gemini-2.0-flash-exp"; // Use 2.5 flash if available, but 2.0 flash exp
 
-function readGroqApiKey(): string {
-  return process.env.GROQ_API_KEY || "";
+function readGeminiApiKey(): string {
+  return process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
 }
 
-export function validateGroqSetup(): { valid: boolean; error?: string } {
-  const apiKey = readGroqApiKey();
+export function validateGeminiSetup(): { valid: boolean; error?: string } {
+  const apiKey = readGeminiApiKey();
   if (!apiKey) {
-    return { valid: false, error: "GROQ_API_KEY environment variable is not set" };
+    return { valid: false, error: "GOOGLE_API_KEY or GEMINI_API_KEY environment variable is not set" };
   }
   return { valid: true };
 }
 
-export async function generateGroqResponse(
+export async function generateGeminiResponse(
   message: string,
   context: {
     systemPrompt: string;
@@ -24,28 +24,32 @@ export async function generateGroqResponse(
     maxTokens?: number;
   }
 ) {
-  const apiKey = readGroqApiKey();
-  if (!apiKey) throw new Error("Groq API key not configured");
+  const apiKey = readGeminiApiKey();
+  if (!apiKey) throw new Error("Gemini API key not configured");
 
-  const groq = new Groq({ apiKey });
+  const genAI = new GoogleAI({ apiKey });
+  const model = genAI.generativeModel(GEMINI_MODEL);
 
   const messages = [
-    { role: "system", content: context.systemPrompt },
+    { role: "user", parts: [{ text: context.systemPrompt }] },
     ...(context.history || []).map(h => ({
-      role: h.role as "user" | "assistant",
-      content: h.content
+      role: h.role as "user" | "model",
+      parts: [{ text: h.content }]
     })),
-    { role: "user", content: message }
+    { role: "user", parts: [{ text: message }] }
   ];
 
-  const completion = await groq.chat.completions.create({
-    model: GROQ_MODEL,
-    messages,
+  const generationConfig = {
     temperature: context.temperature || 0.7,
-    max_tokens: context.maxTokens || 2048,
+    maxOutputTokens: context.maxTokens || 2048,
+  };
+
+  const result = await model.generateContent({
+    contents: messages,
+    generationConfig,
   });
 
-  return completion.choices[0]?.message?.content || "";
+  return result.response.text();
 }
 
 export async function streamGeneralChat(
@@ -65,7 +69,7 @@ export async function streamGeneralChat(
     maxTokens: kind === "brief" ? 512 : 2048,
   };
 
-  const text = await generateGroqResponse(message, context);
+  const text = await generateGeminiResponse(message, context);
   return textToStream(text);
 }
 
@@ -75,25 +79,16 @@ export async function streamStockAnalysis(
   history: Array<{ role: "user" | "assistant"; content: string }>,
   userMemory?: string
 ): Promise<ReadableStream<Uint8Array>> {
-  // Groq as fallback for stock
-  const systemPrompt = "You are AlphaSight AI, a friendly and knowledgeable financial assistant. Provide stock analysis based on the provided data. Always be truthful, no assumptions.";
-
-  const context = {
-    systemPrompt: userMemory ? `${systemPrompt}\n\nUser context: ${userMemory}` : systemPrompt,
-    history,
-    temperature: 0.6,
-    maxTokens: 4096,
-  };
-
-  const text = await generateGroqResponse(message, context);
-  return textToStream(text);
+  // For stock, use Gemini if needed, but user said Mistral for complex
+  // Perhaps not implement, or throw error
+  throw new Error("Gemini not configured for stock analysis");
 }
 
-export function friendlyGroqError(error: any): string {
+export function friendlyGeminiError(error: any): string {
   if (error?.message?.includes("API key")) {
-    return "Groq API key is not configured";
+    return "Gemini API key is not configured";
   }
-  return "Groq service is temporarily unavailable";
+  return "Gemini service is temporarily unavailable";
 }
 
 export async function generateDailyBrief(prompt: string): Promise<string> {
@@ -103,5 +98,5 @@ export async function generateDailyBrief(prompt: string): Promise<string> {
     maxTokens: 1500,
   };
 
-  return await generateGroqResponse(prompt, context);
+  return await generateGeminiResponse(prompt, context);
 }

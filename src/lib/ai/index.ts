@@ -13,6 +13,13 @@ import {
   friendlyGroqError,
   generateDailyBrief as groqGenerateDailyBrief,
 } from "./groq";
+// import {
+//   streamStockAnalysis as geminiStockStream,
+//   streamGeneralChat as geminiGeneralStream,
+//   validateGeminiSetup,
+//   friendlyGeminiError,
+//   generateDailyBrief as geminiGenerateDailyBrief,
+// } from "./gemini";
 
 type ChatRole = "user" | "assistant";
 type ChatHistory = Array<{ role: ChatRole; content: string }>;
@@ -32,31 +39,35 @@ interface StreamChatArgs {
 export function validateAiSetup(): {
   valid: boolean;
   error?: string;
-  primary: "mistral" | "groq" | "none";
-  auxiliary: "groq" | "mistral" | "none";
+  stockPrimary: "mistral" | "groq" | "none";
+  generalPrimary: "groq" | "mistral" | "none";
+  fallback: "groq" | "mistral" | "none";
 } {
   const mistral = validateMistralSetup();
   const groq = validateGroqSetup();
+  // const gemini = validateGeminiSetup();
 
-  if (mistral.valid) {
+  const stockPrimary = mistral.valid ? "mistral" : groq.valid ? "groq" : "none";
+  const generalPrimary = groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
+  const fallback = groq.valid ? "groq" : mistral.valid ? "mistral" : "none";
+
+  const valid = stockPrimary !== "none" && generalPrimary !== "none";
+
+  if (!valid) {
     return {
-      valid: true,
-      primary: "mistral",
-      auxiliary: groq.valid ? "groq" : "none",
+      valid: false,
+      stockPrimary: "none",
+      generalPrimary: "none",
+      fallback: "none",
+      error: `No LLM configured. Mistral: ${mistral.error}, Groq: ${groq.error}`,
     };
   }
-  if (groq.valid) {
-    return {
-      valid: true,
-      primary: "groq",
-      auxiliary: "none",
-    };
-  }
+
   return {
-    valid: false,
-    primary: "none",
-    auxiliary: "none",
-    error: `No LLM configured. Mistral: ${mistral.error}, Groq: ${groq.error}`,
+    valid: true,
+    stockPrimary,
+    generalPrimary,
+    fallback,
   };
 }
 
@@ -68,10 +79,11 @@ export async function streamChat(
     throw new Error("No LLM provider is configured");
   }
 
-  const tryProviders = setup.primary === "mistral" ? ["mistral", "groq"] : ["groq", "mistral"];
+  const providers = args.mode === "stock"
+    ? [setup.stockPrimary, setup.fallback].filter(p => p !== "none")
+    : [setup.generalPrimary, setup.fallback].filter(p => p !== "none");
 
-  for (const provider of tryProviders) {
-    if (provider === "none") continue;
+  for (const provider of providers) {
     try {
       let stream: ReadableStream<Uint8Array>;
       if (args.mode === "stock") {
@@ -83,7 +95,7 @@ export async function streamChat(
             args.history,
             args.userMemory
           );
-        } else {
+        } else if (provider === "groq") {
           stream = await groqStockStream(
             args.message,
             args.analysis,
@@ -92,15 +104,15 @@ export async function streamChat(
           );
         }
       } else {
-        if (provider === "mistral") {
-          stream = await mistralGeneralStream(
+        if (provider === "groq") {
+          stream = await groqGeneralStream(
             args.message,
             args.history,
             args.kind ?? "normal",
             args.userMemory
           );
-        } else {
-          stream = await groqGeneralStream(
+        } else if (provider === "mistral") {
+          stream = await mistralGeneralStream(
             args.message,
             args.history,
             args.kind ?? "normal",
