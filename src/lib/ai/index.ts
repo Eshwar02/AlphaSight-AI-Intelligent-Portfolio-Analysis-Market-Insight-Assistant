@@ -6,6 +6,13 @@ import {
   friendlyMistralError,
   generateDailyBrief as mistralGenerateDailyBrief,
 } from "./mistral";
+import {
+  streamStockAnalysis as groqStockStream,
+  streamGeneralChat as groqGeneralStream,
+  validateGroqSetup,
+  friendlyGroqError,
+  generateDailyBrief as groqGenerateDailyBrief,
+} from "./groq";
 
 type ChatRole = "user" | "assistant";
 type ChatHistory = Array<{ role: ChatRole; content: string }>;
@@ -25,15 +32,23 @@ interface StreamChatArgs {
 export function validateAiSetup(): {
   valid: boolean;
   error?: string;
-  primary: "mistral" | "none";
-  auxiliary: "none";
+  primary: "mistral" | "groq" | "none";
+  auxiliary: "groq" | "mistral" | "none";
 } {
   const mistral = validateMistralSetup();
+  const groq = validateGroqSetup();
 
   if (mistral.valid) {
     return {
       valid: true,
       primary: "mistral",
+      auxiliary: groq.valid ? "groq" : "none",
+    };
+  }
+  if (groq.valid) {
+    return {
+      valid: true,
+      primary: "groq",
       auxiliary: "none",
     };
   }
@@ -41,34 +56,64 @@ export function validateAiSetup(): {
     valid: false,
     primary: "none",
     auxiliary: "none",
-    error: `No LLM configured. Mistral: ${mistral.error}`,
+    error: `No LLM configured. Mistral: ${mistral.error}, Groq: ${groq.error}`,
   };
 }
 
 export async function streamChat(
   args: StreamChatArgs
 ): Promise<ReadableStream<Uint8Array>> {
-  const mistralOk = validateMistralSetup().valid;
-
-  if (!mistralOk) {
-    throw new Error("No LLM provider is configured (need MISTRAL_API_KEY)");
+  const setup = validateAiSetup();
+  if (!setup.valid) {
+    throw new Error("No LLM provider is configured");
   }
 
-  if (args.mode === "stock") {
-    if (!args.analysis) throw new Error("Stock mode requires analysis data");
-    return mistralStockStream(
-      args.message,
-      args.analysis,
-      args.history,
-      args.userMemory
-    );
+  const tryProviders = setup.primary === "mistral" ? ["mistral", "groq"] : ["groq", "mistral"];
+
+  for (const provider of tryProviders) {
+    if (provider === "none") continue;
+    try {
+      if (args.mode === "stock") {
+        if (!args.analysis) throw new Error("Stock mode requires analysis data");
+        if (provider === "mistral") {
+          return mistralStockStream(
+            args.message,
+            args.analysis,
+            args.history,
+            args.userMemory
+          );
+        } else {
+          return groqStockStream(
+            args.message,
+            args.analysis,
+            args.history,
+            args.userMemory
+          );
+        }
+      } else {
+        if (provider === "mistral") {
+          return mistralGeneralStream(
+            args.message,
+            args.history,
+            args.kind ?? "normal",
+            args.userMemory
+          );
+        } else {
+          return groqGeneralStream(
+            args.message,
+            args.history,
+            args.kind ?? "normal",
+            args.userMemory
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(`Provider ${provider} failed:`, err);
+      continue;
+    }
   }
-  return mistralGeneralStream(
-    args.message,
-    args.history,
-    args.kind ?? "normal",
-    args.userMemory
-  );
+
+  throw new Error("All LLM providers failed");
 }
 
 export async function generateDailyBrief(prompt: string): Promise<string> {
@@ -77,12 +122,22 @@ export async function generateDailyBrief(prompt: string): Promise<string> {
     return `Unable to generate brief. ${setup.error ?? "No AI provider configured."}`;
   }
 
-  const mistralText = await mistralGenerateDailyBrief(prompt);
-  if (mistralText && !/^Unable to generate brief/i.test(mistralText)) {
-    return mistralText;
+  const providers = setup.primary === "mistral" ? ["mistral", "groq"] : ["groq", "mistral"];
+
+  for (const provider of providers) {
+    try {
+      const text = provider === "mistral"
+        ? await mistralGenerateDailyBrief(prompt)
+        : await groqGenerateDailyBrief(prompt);
+      if (text && !/^Unable to generate brief/i.test(text)) {
+        return text;
+      }
+    } catch (err) {
+      console.warn(`Daily brief provider ${provider} failed:`, err);
+    }
   }
 
-  return mistralText || "Unable to generate brief right now.";
+  return "Unable to generate brief right now.";
 }
 
 export async function classifyIntent(message: string): Promise<{
