@@ -7,7 +7,7 @@ import { ChatMessage } from './chat-message';
 import { WelcomeScreen } from './welcome-screen';
 import { GradientAIChatInput, type ModelOption } from '@/components/ui/gradient-ai-chat-input';
 import { cn } from '@/lib/utils';
-import { BookOpen } from 'lucide-react';
+
 
 const MODEL_OPTIONS: ModelOption[] = [
   {
@@ -42,7 +42,6 @@ export function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState('');
-  const [memoryNotes, setMemoryNotes] = useState<string[]>(['Key insights from conversations will appear here.']);
 
   const hasMessages = messages.length > 0;
 
@@ -91,21 +90,7 @@ export function ChatPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-dark-900">
-      {/* Memory Layer */}
-      <div className="bg-dark-800 border-b border-dark-700 px-4 py-2">
-        <div className="flex items-center gap-2 mb-2">
-          <BookOpen className="h-4 w-4 text-accent-green" />
-          <span className="text-sm font-medium text-gray-200">Memory & Keypoints</span>
-        </div>
-        <div className="text-xs text-gray-400 space-y-1 max-h-20 overflow-y-auto">
-          {memoryNotes.map((note, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className="text-accent-green">•</span>
-              <span>{note}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+
 
       <div
         ref={scrollRef}
