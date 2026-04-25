@@ -71,11 +71,11 @@ export async function buildUserContext(
     return "";
   }
 
-  const lines: string[] = ["## User Memory"];
+  const lines: string[] = [];
 
   if (memory.length > 0) {
     for (const m of memory) {
-      lines.push(`${m.key}: ${m.value}`);
+      lines.push(`User ${m.key}: ${m.value}`);
     }
   }
 
@@ -98,7 +98,7 @@ export async function buildUserContext(
   }
 
   lines.push(
-    "Use this context naturally when relevant (e.g. if user asks about their holdings, mentions a symbol they hold, or asks about remembered info like name). Never invent prices or positions not listed here."
+    "Use this context naturally when relevant. Never invent data."
   );
 
   const joined = lines.join("\n");
