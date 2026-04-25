@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, LineSeries } from 'lightweight-charts';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -602,8 +602,12 @@ function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding;
                   {data?.news && data.news.length > 0 ? (
                     <div className="space-y-4">
                       {data.news.slice(0, 5).map((item: any, idx: number) => (
-                        <div key={idx} className="border-b border-dark-700 pb-4 last:border-b-0">
-                          <h4 className="text-sm font-medium text-gray-100 mb-1">{item.title}</h4>
+                        <div key={idx} className="border-b border-dark-700 pb-4 last:border-b-0 hover:shadow-lg transition-shadow duration-200 rounded-lg p-3 hover:bg-dark-800/50">
+                          <h4 className="text-sm font-medium text-gray-100 mb-1">
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:text-accent-green transition-colors">
+                              {item.title}
+                            </a>
+                          </h4>
                           <p className="text-xs text-gray-400 mb-2">{item.source} • {new Date(item.publishedAt).toLocaleDateString()}</p>
                           <p className="text-sm text-gray-300">{item.summary}</p>
                         </div>
@@ -653,7 +657,7 @@ function StockChart({ data }: { data: any[] }) {
       height: 300,
     });
 
-    const lineSeries = (chart as any).addLineSeries({
+    const lineSeries = chart.addSeries(LineSeries, {
       color: '#10b981',
       lineWidth: 2,
     });
