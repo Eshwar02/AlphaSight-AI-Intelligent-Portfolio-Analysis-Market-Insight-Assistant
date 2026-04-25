@@ -104,6 +104,7 @@ export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.05 }}
         className="mb-8 text-center hero-title text-gray-100"
+        suppressHydrationWarning
       >
         {greeting}
       </motion.h1>
