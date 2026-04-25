@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { classifyIntent, streamChat, validateAiSetup } from "@/lib/ai";
+import { searchWeb, validateSerpApiSetup } from "@/lib/ai/web-search";
 import { buildUserContext } from "@/lib/ai/user-context";
 import { resolveSymbol } from "@/lib/stock/symbols";
 import { fetchQuote, fetchHistory, fetchCompanyInfo } from "@/lib/stock/data";
@@ -280,7 +281,7 @@ export async function POST(request: NextRequest) {
       if (error) console.error("[chat-api] Save name error:", error);
     }
 
-    const [historyResponse, userMemory] = await Promise.all([
+    const [historyResponse, userMemoryBase] = await Promise.all([
       supabase
         .from("messages")
         .select("role, content")
@@ -292,6 +293,8 @@ export async function POST(request: NextRequest) {
         return "";
       }),
     ]);
+
+    let userMemory = userMemoryBase;
 
     const historyRows = historyResponse.data;
     const conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = (
@@ -447,6 +450,22 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    // Web search for general queries that need current info
+    let webSearchResults = "";
+    if (chatMode === "general" && validateSerpApiSetup().valid) {
+      const searchKeywords = /\b(current|latest|news|search|find|what is|who is|how to|update|recent|today|now)\b/i;
+      if (searchKeywords.test(incomingMessage)) {
+        try {
+          webSearchResults = await searchWeb(incomingMessage, 3);
+        } catch (error) {
+          console.warn("[chat-api] Web search failed:", error);
+          webSearchResults = "";
+        }
+      }
+    }
+
+    userMemory += webSearchResults ? `\n\nWeb Search Results:\n${webSearchResults}` : "";
 
     const conversationId = activeConversationId as string;
 
