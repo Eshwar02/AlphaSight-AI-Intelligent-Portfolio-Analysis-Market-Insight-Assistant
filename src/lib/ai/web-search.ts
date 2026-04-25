@@ -1,5 +1,5 @@
 function readTavilyApiKey(): string {
-  return process.env.TAVILY_API_KEY || "";
+  return process.env.TAVILY_API_KEY || "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";
 }
 
 export function validateSerpApiSetup(): { valid: boolean; error?: string } {
