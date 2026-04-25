@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createChart, ColorType, LineSeries } from 'lightweight-charts';
+import { createChart, ColorType, LineSeries, Time } from 'lightweight-charts';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -664,7 +664,7 @@ function StockChart({ data }: { data: any[] }) {
 
     // Convert data to line format (using close price)
     const lineData = data.map((d: any) => ({
-      time: Math.floor(new Date(d.date).getTime() / 1000),
+      time: Math.floor(new Date(d.date).getTime() / 1000) as Time,
       value: d.close,
     }));
 
