@@ -75,7 +75,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   );
 
   const streamingContent = useMemo(
-    () => normalizedContent.replace(/\*\*/g, '').replace(/^#+\s*/gm, ''),
+    () => normalizedContent.replace(/^#+\s*/gm, ''),
     [normalizedContent],
   );
 
@@ -134,25 +134,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <AssistantMark />
           <div className="min-w-0 flex-1">
             {/* Body */}
-            {isStreaming && hasStreamingText && (
-              <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-gray-200">
-                {streamingContent}
-              </div>
+            {hasStreamingText && (
+              <MarkdownRenderer content={normalizedContent} streaming={isStreaming} />
             )}
-            {!isStreaming && hasContent && (
-              <MarkdownRenderer content={normalizedContent} />
-            )}
-            {!isStreaming && hasContent && (
-              <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-gray-200">
-                {normalizedContent.split('\n').map((line, i) => {
-                  const trimmed = line.trim();
-                  const isHeading = trimmed && trimmed === trimmed.toUpperCase() && trimmed.length > 3;
-                  return (
-                    <div key={i} className={isHeading ? 'font-bold text-xl mb-3 mt-5 uppercase' : 'mb-1'}>
-                      {line || '\u00A0'}
-                    </div>
-                  );
-                })}
+            {!hasStreamingText && isStreaming && <StreamingDots />}
+            {!hasContent && !isStreaming && (
+              <div className="text-[15px] leading-7 text-gray-400 italic">
+                {EMPTY_RESPONSE_FALLBACK}
               </div>
             )}
             {!hasStreamingText && isStreaming && <StreamingDots />}

@@ -77,7 +77,7 @@ export function useChat() {
         } catch {
           // abort() can throw if the underlying fetch has already settled; ignore
         }
-      }, 60000);
+      }, 120000);
 
       try {
         const res = await fetch('/api/chat', {

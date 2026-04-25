@@ -1,13 +1,10 @@
-import { STOCK_ANALYSIS_SYSTEM_PROMPT as SYSTEM_PROMPT } from "./prompts";
+import { STOCK_ANALYSIS_SYSTEM_PROMPT, GENERAL_CHAT_PROMPT, DAILY_BRIEF_PROMPT } from "./prompts";
 import type { StockAnalysis } from "@/types/stock";
 
 const STOCK_ANALYSIS_MODEL = "mistral-large-latest";
 const GENERAL_CHAT_MODEL = "mistral-small-latest";
 const DAILY_BRIEF_MODEL = "mistral-large-latest";
 const MISTRAL_ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
-const STOCK_ANALYSIS_SYSTEM_PROMPT = SYSTEM_PROMPT;
-const GENERAL_CHAT_PROMPT = SYSTEM_PROMPT;
-const DAILY_BRIEF_PROMPT = SYSTEM_PROMPT;
 
 const MAX_RETRIES = 1;
 
@@ -67,14 +64,14 @@ export function friendlyMistralError(err: unknown): string {
   return `Mistral error: ${short}`;
 }
 
-const HISTORY_MSG_CHAR_CAP = 320;
+const HISTORY_MSG_CHAR_CAP = 500;
 
 function buildMessages(
   systemPrompt: string,
   latestPrompt: string,
   history: Array<{ role: ChatRole; content: string }>
 ): MistralMessage[] {
-  const trimmedHistory = history.slice(-8).map((m) => {
+  const trimmedHistory = history.slice(-4).map((m) => {
     const content =
       m.content.length > HISTORY_MSG_CHAR_CAP
         ? m.content.slice(0, HISTORY_MSG_CHAR_CAP) + " …[truncated]"
@@ -280,8 +277,8 @@ function buildStockContext(analysis: StockAnalysis): string {
     companyInfo,
   } = analysis;
 
-  let context = `## Real-Time Data for ${quote.name} (${quote.symbol})\n\n`;
-  context += `### Price & Market Data\n`;
+  let context = `REAL-TIME DATA FOR ${quote.name} (${quote.symbol})\n\n`;
+  context += `PRICE & MARKET DATA\n`;
   context += `- Current Price: ${quote.currency} ${quote.price.toFixed(2)}\n`;
   context += `- Change: ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%)\n`;
   context += `- Open: ${quote.currency} ${quote.open.toFixed(2)}\n`;
@@ -294,7 +291,7 @@ function buildStockContext(analysis: StockAnalysis): string {
   context += `- Exchange: ${quote.exchange}\n\n`;
 
   if (companyInfo) {
-    context += `### Company Profile\n`;
+    context += `COMPANY PROFILE\n`;
     context += `- Sector: ${companyInfo.sector}\n`;
     context += `- Industry: ${companyInfo.industry}\n`;
     context += `- Country: ${companyInfo.country || "N/A"}\n`;
@@ -306,18 +303,18 @@ function buildStockContext(analysis: StockAnalysis): string {
   }
 
   if (history.length > 0) {
-    context += `### Historical Performance\n`;
+    context += `HISTORICAL PERFORMANCE\n`;
     context += `- Data Range: ${history[0].date} to ${history[history.length - 1].date}\n\n`;
   }
 
-  context += `### Technical Indicators\n`;
+  context += `TECHNICAL INDICATORS\n`;
   context += `- 20-day SMA: ${technicals.sma20 !== null ? technicals.sma20.toFixed(2) : "N/A"}\n`;
   context += `- 50-day SMA: ${technicals.sma50 !== null ? technicals.sma50.toFixed(2) : "N/A"}\n`;
   context += `- RSI (14): ${technicals.rsi !== null ? technicals.rsi.toFixed(2) : "N/A"}\n`;
   context += `- Trend Direction: ${technicals.trend.toUpperCase()}\n\n`;
 
   if (news.length > 0) {
-    context += `### Recent News (${news.length} items)\n`;
+    context += `RECENT NEWS (${news.length} items)\n`;
     for (const item of news.slice(0, 8)) {
       context += `- ${item.title} — ${item.source} (${item.publishedAt.split("T")[0]}) [${item.url}]\n`;
     }
@@ -325,13 +322,13 @@ function buildStockContext(analysis: StockAnalysis): string {
   }
 
   if (macroRisks.length > 0) {
-    context += `### Macro Risks\n`;
+    context += `MACRO RISKS\n`;
     for (const risk of macroRisks) context += `- ${risk}\n`;
     context += "\n";
   }
 
   if (rawMaterialRisks.length > 0) {
-    context += `### Raw Material Risks\n`;
+    context += `RAW MATERIAL RISKS\n`;
     for (const risk of rawMaterialRisks) context += `- ${risk}\n`;
     context += "\n";
   }
@@ -406,7 +403,7 @@ export async function streamGeneralChat(
     model: GENERAL_CHAT_MODEL,
     stream: true,
     temperature: kind === "brief" ? 0.8 : 0.6,
-    maxTokens: kind === "brief" ? 140 : 4096,
+    maxTokens: kind === "brief" ? 140 : 8192,
     timeoutMs: 120_000,
   });
   return typeof stream === "string" ? textToStream(stream) : stream;

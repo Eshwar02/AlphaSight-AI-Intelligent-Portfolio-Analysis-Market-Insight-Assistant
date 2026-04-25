@@ -95,7 +95,7 @@ export function WatchlistView() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900">
+    <div className="bg-dark-900">
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">

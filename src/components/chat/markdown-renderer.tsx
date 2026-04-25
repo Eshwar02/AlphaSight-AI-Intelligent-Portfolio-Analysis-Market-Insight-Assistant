@@ -160,7 +160,9 @@ export function MarkdownRenderer({ content, className, streaming = false }: Mark
             </a>
           ),
         }}
-      />
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

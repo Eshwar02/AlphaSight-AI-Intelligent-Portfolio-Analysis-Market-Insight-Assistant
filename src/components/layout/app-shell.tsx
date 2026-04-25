@@ -27,12 +27,12 @@ export function AppShell({ children }: AppShellProps) {
   }, [setSidebarOpen]);
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden">
+    <div className="flex h-dvh w-full overflow-auto">
       <Sidebar />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Header />
-        <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+        <main className="min-h-0 flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );

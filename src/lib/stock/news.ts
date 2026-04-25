@@ -1,5 +1,6 @@
 import type { NewsItem } from "@/types/stock";
 import { yahoo } from "@/lib/stock/yahoo";
+import { stockCache, CACHE_TTL } from "./cache";
 
 const MARKETAUX_API_KEY = process.env.MARKETAUX_API_KEY;
 const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
@@ -206,6 +207,12 @@ export async function fetchStockNews(
   companyName: string = "",
   extraThemeQueries: string[] = []
 ): Promise<NewsItem[]> {
+  const cacheKey = `news:${symbol.toUpperCase()}:${companyName}`;
+  const cached = stockCache.get<NewsItem[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const themeQueries =
     extraThemeQueries.length > 0
       ? extraThemeQueries
@@ -226,8 +233,8 @@ export async function fetchStockNews(
   const googleCompanyNews = await fetchGoogleNewsRss(`${sourceQuery} (${siteFilter})`);
   newsItems.push(...googleCompanyNews);
 
-  // Product/theme-based enrichment (key requirement).
-  for (const q of themeQueries.slice(0, 4)) {
+  // Product/theme-based enrichment (key requirement) - limit to 2 for performance
+  for (const q of themeQueries.slice(0, 2)) {
     const thematic = await fetchGoogleNewsRss(`${q} (${siteFilter})`);
     newsItems.push(...thematic);
   }
@@ -283,13 +290,20 @@ export async function fetchStockNews(
     return true;
   });
 
-  // Return up to 10 items, most recent first
-  return unique
+  // Return up to 6 items (reduced for performance), most recent first
+  const result = unique
     .sort(
       (a, b) =>
         new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     )
-    .slice(0, MAX_NEWS_ITEMS);
+    .slice(0, 6);
+
+  // Cache the result
+  if (result.length > 0) {
+    stockCache.set(cacheKey, result, CACHE_TTL.NEWS);
+  }
+
+  return result;
 }
 
 // ── Helper ───────────────────────────────────────────────────────────

@@ -30,7 +30,7 @@ export function SettingsView() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900">
+    <div className="bg-dark-900">
       <div className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-100">
           <SettingsIcon className="h-6 w-6 text-accent-green" />

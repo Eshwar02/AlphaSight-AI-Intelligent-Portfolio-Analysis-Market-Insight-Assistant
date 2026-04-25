@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
         .select("role, content")
         .eq("conversation_id", activeConversationId)
         .order("created_at", { ascending: true })
-        .limit(20),
+        .limit(6),
       buildUserContext(supabase, user.id).catch((err) => {
         console.warn("[chat-api] buildUserContext failed", err);
         return "";
@@ -341,7 +341,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (stockQuery) {
-      const resolvedSymbol = await withTimeout(resolveSymbol(stockQuery), 15000, "resolveSymbol");
+      const resolvedSymbol = await withTimeout(resolveSymbol(stockQuery), 8000, "resolveSymbol");
       console.debug("[chat-api] symbol resolution", {
         query: stockQuery,
         symbol: resolvedSymbol ?? null,
@@ -354,44 +354,82 @@ export async function POST(request: NextRequest) {
       }
       if (resolvedSymbol) {
         try {
-          const quote = await withTimeout(fetchQuote(resolvedSymbol), 20000, "fetchQuote");
+          const quote = await withTimeout(fetchQuote(resolvedSymbol), 10000, "fetchQuote");
           if (!quote) throw new Error("Quote not found");
 
+          // Detect if this is a simple query (price, quote, etc.) to skip heavy data fetching
+          const isSimpleQuery = /\b(price|quote|current|worth|cost|value|trading\s+at)\b/i.test(incomingMessage) &&
+                                !/\b(analyze|analysis|technical|fundamental|news|sentiment|recommend|buy|sell|invest)\b/i.test(incomingMessage);
+
+          if (isSimpleQuery) {
+            console.debug("[chat-api] simple stock query detected, skipping heavy data");
+            // For simple queries, just get quote and minimal data
+            stockAnalysis = compactStockAnalysis({
+              quote,
+              history: [], // Skip history for simple queries
+              technicals: {
+                sma20: null,
+                sma50: null,
+                ema20: null,
+                rsi: null,
+                macd: { macdLine: null, signalLine: null, histogram: null },
+                supportLevels: [],
+                resistanceLevels: [],
+                breakoutZones: [],
+                trend: "neutral"
+              },
+              news: [], // Skip news for simple queries
+              macroRisks: [],
+              rawMaterialRisks: [],
+              companyInfo: {
+                sector: "Unknown",
+                industry: "Unknown",
+                description: "",
+                employees: null,
+                website: "",
+                country: "",
+              },
+            });
+            chatMode = "stock";
+            console.debug("[chat-api] simple stock analysis ready", { symbol: resolvedSymbol });
+          } else {
+            // Full analysis for complex queries
           const [historyResult, companyInfoResult, newsResult] = await Promise.allSettled([
-            withTimeout(fetchHistory(resolvedSymbol, 3), 25000, "fetchHistory"),
-            withTimeout(fetchCompanyInfo(resolvedSymbol), 20000, "fetchCompanyInfo"),
-            withTimeout(fetchStockNews(resolvedSymbol), 20000, "fetchStockNews"),
+            withTimeout(fetchHistory(resolvedSymbol, 1), 10000, "fetchHistory"), // Faster timeout
+            withTimeout(fetchCompanyInfo(resolvedSymbol), 10000, "fetchCompanyInfo"), // Faster timeout
+            withTimeout(fetchStockNews(resolvedSymbol), 10000, "fetchStockNews"), // Faster timeout
           ]);
 
-          const history = historyResult.status === "fulfilled" ? historyResult.value : [];
-          const companyInfo =
-            companyInfoResult.status === "fulfilled"
-              ? companyInfoResult.value
-              : {
-                  sector: "Unknown",
-                  industry: "Unknown",
-                  description: "",
-                  employees: null,
-                  website: "",
-                  country: "",
-                };
-          const news = newsResult.status === "fulfilled" ? newsResult.value : [];
+            const history = historyResult.status === "fulfilled" ? historyResult.value : [];
+            const companyInfo =
+              companyInfoResult.status === "fulfilled"
+                ? companyInfoResult.value
+                : {
+                    sector: "Unknown",
+                    industry: "Unknown",
+                    description: "",
+                    employees: null,
+                    website: "",
+                    country: "",
+                  };
+            const news = newsResult.status === "fulfilled" ? newsResult.value : [];
 
-          stockAnalysis = compactStockAnalysis({
-            quote,
-            history,
-            technicals: analyzeTechnicals(history, quote.price),
-            news,
-            macroRisks: assessMacroRisks(resolvedSymbol, companyInfo.sector, companyInfo.country),
-            rawMaterialRisks: assessRawMaterialRisks(resolvedSymbol, companyInfo.sector),
-            companyInfo,
-          });
-          chatMode = "stock";
-          console.debug("[chat-api] stock analysis ready", {
-            symbol: resolvedSymbol,
-            historyPoints: history.length,
-            newsCount: news.length,
-          });
+            stockAnalysis = compactStockAnalysis({
+              quote,
+              history,
+              technicals: analyzeTechnicals(history, quote.price),
+              news,
+              macroRisks: assessMacroRisks(resolvedSymbol, companyInfo.sector, companyInfo.country),
+              rawMaterialRisks: assessRawMaterialRisks(resolvedSymbol, companyInfo.sector),
+              companyInfo,
+            });
+            chatMode = "stock";
+            console.debug("[chat-api] full stock analysis ready", {
+              symbol: resolvedSymbol,
+              historyPoints: history.length,
+              newsCount: news.length,
+            });
+          }
         } catch (stockError) {
           console.error("[chat-api] stock enrichment failed", stockError);
           llmMessage = `${incomingMessage}\n\nNote: Live stock lookup for "${resolvedSymbol}" failed (${stockError instanceof Error ? stockError.message : String(stockError)}). Explain this briefly, then continue with a useful text-only analysis.`;
@@ -414,7 +452,7 @@ export async function POST(request: NextRequest) {
           model: requestedModel,
           userMemory: userMemory || undefined,
         }),
-        120_000,
+        90_000,
         "streamChat"
       );
     } catch (llmError) {
@@ -428,7 +466,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const timedStream = withStreamTimeout(llmStream, 90_000);
+    const timedStream = withStreamTimeout(llmStream, 60_000);
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
     const chunks: string[] = [];

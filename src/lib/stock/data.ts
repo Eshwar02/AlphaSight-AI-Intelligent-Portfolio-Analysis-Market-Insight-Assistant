@@ -1,5 +1,6 @@
 import type { StockQuote, StockHistory } from "@/types/stock";
 import { yahoo } from "@/lib/stock/yahoo";
+import { stockCache, CACHE_TTL } from "./cache";
 
 type YahooChartMeta = {
   symbol?: string;
@@ -132,13 +133,23 @@ function mapHistoryFromChart(chart: YahooChartResult): StockHistory {
  * Returns null if the symbol is invalid or the request fails.
  */
 export async function fetchQuote(symbol: string): Promise<StockQuote | null> {
+  const cacheKey = `quote:${symbol.toUpperCase()}`;
+  const cached = stockCache.get<StockQuote>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   // Use chart API directly — the yahoo-finance2 SDK's quote() is broken
   // (crumb/cookie auth issues, 429 rate limits). The v8 chart endpoint
   // works reliably and includes quote data in its `meta` field.
   try {
     const chart = await fetchChartResult(symbol, { range: "5d", interval: "1d" });
     if (!chart) return null;
-    return mapQuoteFromChart(symbol, chart);
+    const quote = mapQuoteFromChart(symbol, chart);
+    if (quote) {
+      stockCache.set(cacheKey, quote, CACHE_TTL.QUOTE);
+    }
+    return quote;
   } catch (error) {
     console.error(
       `[fetchQuote] Failed for ${symbol}:`,
@@ -167,6 +178,13 @@ export async function fetchHistory(
   const from = period1 || defaultStart;
   const to = period2 || new Date();
 
+  // Create a cache key that includes the date range to avoid cache collisions
+  const cacheKey = `history:${symbol.toUpperCase()}:${years}:${Math.floor(from.getTime() / 86400000)}:${Math.floor(to.getTime() / 86400000)}`;
+  const cached = stockCache.get<StockHistory>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const chart = await fetchChartResult(symbol, {
     period1: Math.floor(from.getTime() / 1000).toString(),
     period2: Math.floor(to.getTime() / 1000).toString(),
@@ -175,7 +193,11 @@ export async function fetchHistory(
   });
 
   if (!chart) return [];
-  return mapHistoryFromChart(chart);
+  const history = mapHistoryFromChart(chart);
+  if (history.length > 0) {
+    stockCache.set(cacheKey, history, CACHE_TTL.HISTORY);
+  }
+  return history;
 }
 
 /**
@@ -189,13 +211,26 @@ export async function fetchCompanyInfo(symbol: string): Promise<{
   website: string;
   country: string;
 }> {
+  const cacheKey = `company:${symbol.toUpperCase()}`;
+  const cached = stockCache.get<{
+    sector: string;
+    industry: string;
+    description: string;
+    employees: number | null;
+    website: string;
+    country: string;
+  }>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   try {
     const result = await yahoo.quoteSummary(symbol, {
       modules: ["assetProfile"],
     });
 
     const profile = result.assetProfile;
-    return {
+    const info = {
       sector: profile?.sector || "Unknown",
       industry: profile?.industry || "Unknown",
       description: profile?.longBusinessSummary || "",
@@ -203,8 +238,10 @@ export async function fetchCompanyInfo(symbol: string): Promise<{
       website: profile?.website || "",
       country: profile?.country || "",
     };
+    stockCache.set(cacheKey, info, CACHE_TTL.COMPANY_INFO);
+    return info;
   } catch {
-    return {
+    const fallback = {
       sector: "Unknown",
       industry: "Unknown",
       description: "",
@@ -212,5 +249,7 @@ export async function fetchCompanyInfo(symbol: string): Promise<{
       website: "",
       country: "",
     };
+    stockCache.set(cacheKey, fallback, CACHE_TTL.COMPANY_INFO);
+    return fallback;
   }
 }
