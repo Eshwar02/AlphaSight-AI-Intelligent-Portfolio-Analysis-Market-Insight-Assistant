@@ -653,24 +653,18 @@ function StockChart({ data }: { data: any[] }) {
       height: 300,
     });
 
-    const candlestickSeries = (chart as any).addCandlestickSeries({
-      upColor: '#10b981',
-      downColor: '#ef4444',
-      borderVisible: false,
-      wickUpColor: '#10b981',
-      wickDownColor: '#ef4444',
+    const lineSeries = (chart as any).addLineSeries({
+      color: '#10b981',
+      lineWidth: 2,
     });
 
-    // Convert data to candlestick format
-    const candlestickData = data.map((d: any) => ({
+    // Convert data to line format (using close price)
+    const lineData = data.map((d: any) => ({
       time: Math.floor(new Date(d.date).getTime() / 1000),
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      close: d.close,
+      value: d.close,
     }));
 
-    candlestickSeries.setData(candlestickData);
+    lineSeries.setData(lineData);
     chart.timeScale().fitContent();
 
     chartRef.current = chart;
