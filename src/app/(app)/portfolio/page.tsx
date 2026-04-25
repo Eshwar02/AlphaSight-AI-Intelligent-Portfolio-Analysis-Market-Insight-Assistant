@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -26,8 +26,11 @@ export function PortfolioView() {
     useState<PortfolioHolding | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedHolding, setSelectedHolding] = useState<PortfolioHolding | null>(null);
-  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const [hoveredHolding, setHoveredHolding] = useState<PortfolioHolding | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  const [stockCache, setStockCache] = useState<Map<string, any>>(new Map());
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchHoldings = useCallback(async () => {
     try {
@@ -80,11 +83,36 @@ export function PortfolioView() {
 
   function handleHoldingClick(holding: PortfolioHolding) {
     setSelectedHolding(holding);
-    setDetailsModalOpen(true);
+    setDetailsDrawerOpen(true);
   }
 
-  function handleHoldingHover(holding: PortfolioHolding | null) {
-    setHoveredHolding(holding);
+  const fetchHoverData = useCallback(async (symbol: string) => {
+    if (stockCache.has(symbol)) return stockCache.get(symbol);
+    try {
+      const res = await fetch(`/api/stock/details/${symbol}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStockCache(prev => new Map(prev.set(symbol, data)));
+        return data;
+      }
+    } catch (err) {
+      console.error('Failed to fetch hover data:', err);
+    }
+    return null;
+  }, [stockCache]);
+
+  function handleHoldingHover(holding: PortfolioHolding | null, event?: React.MouseEvent) {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    if (holding && event) {
+      hoverTimeoutRef.current = setTimeout(async () => {
+        setHoveredHolding(holding);
+        setHoverPosition({ x: event.clientX, y: event.clientY });
+        await fetchHoverData(holding.symbol);
+      }, 150);
+    } else {
+      setHoveredHolding(null);
+      setHoverPosition(null);
+    }
   }
 
   const totalValue = holdings.reduce((s, h) => s + h.currentValue, 0);
@@ -200,7 +228,7 @@ export function PortfolioView() {
                          exit={{ opacity: 0, x: -20 }}
                          className="border-b border-dark-700/50 hover:bg-dark-850 transition-colors cursor-pointer"
                          onClick={() => handleHoldingClick(h)}
-                         onMouseEnter={() => handleHoldingHover(h)}
+                         onMouseEnter={(e) => handleHoldingHover(h, e)}
                          onMouseLeave={() => handleHoldingHover(null)}
                        >
                         <td className="px-4 py-3"><div><p className="font-semibold text-gray-100">{h.name || h.symbol}</p><p className="text-xs text-dark-400">{h.symbol}</p></div></td>
@@ -279,7 +307,7 @@ export function PortfolioView() {
                      exit={{ opacity: 0, x: -20 }}
                      className="rounded-xl border border-dark-700 bg-dark-800 p-4 cursor-pointer"
                      onClick={() => handleHoldingClick(h)}
-                     onMouseEnter={() => handleHoldingHover(h)}
+                     onMouseEnter={(e) => handleHoldingHover(h, e)}
                      onMouseLeave={() => handleHoldingHover(null)}
                    >
                     <div className="flex items-start justify-between mb-3">
@@ -354,24 +382,27 @@ export function PortfolioView() {
         )}
       </div>
 
-      {/* Hover Tooltip */}
-      {hoveredHolding && (
-        <div className="fixed z-50 bg-dark-800 border border-dark-700 rounded-lg p-3 shadow-lg max-w-xs">
-          <div className="text-sm font-medium text-gray-100">{hoveredHolding.name || hoveredHolding.symbol}</div>
-          <div className="text-xs text-gray-400 mt-1">
-            Price: {formatCurrency(hoveredHolding.currentPrice, hoveredHolding.currency || "USD")}
-          </div>
-          <div className="text-xs text-gray-400">
-            Change: {formatCurrency(hoveredHolding.pnl, hoveredHolding.currency || "USD")} ({formatPercent(hoveredHolding.pnlPercent)})
-          </div>
+      {/* Hover Card */}
+      {hoveredHolding && hoverPosition && (
+        <div
+          className="fixed z-50 bg-dark-800 border border-dark-700 rounded-xl p-4 shadow-xl max-w-sm animate-in fade-in-0 zoom-in-95 duration-150"
+          style={{
+            left: hoverPosition.x + 10,
+            top: hoverPosition.y + 10,
+            transform: 'translate(0, 0)',
+          }}
+          onMouseEnter={() => setHoveredHolding(hoveredHolding)} // Keep open
+          onMouseLeave={() => setHoveredHolding(null)}
+        >
+          <HoverCardContent holding={hoveredHolding} data={stockCache.get(hoveredHolding.symbol)} />
         </div>
       )}
 
-      {/* Company Details Modal */}
-      {detailsModalOpen && selectedHolding && (
-        <CompanyDetailsModal
+      {/* Company Details Drawer */}
+      {detailsDrawerOpen && selectedHolding && (
+        <CompanyDetailsDrawer
           holding={selectedHolding}
-          onClose={() => setDetailsModalOpen(false)}
+          onClose={() => setDetailsDrawerOpen(false)}
         />
       )}
 
@@ -388,8 +419,55 @@ export function PortfolioView() {
   );
 }
 
-// Company Details Modal Component
-function CompanyDetailsModal({ holding, onClose }: { holding: PortfolioHolding; onClose: () => void }) {
+// Hover Card Content Component
+function HoverCardContent({ holding, data }: { holding: PortfolioHolding; data: any }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 bg-dark-700 rounded-full flex items-center justify-center">
+          {/* Logo placeholder */}
+          <span className="text-xs font-bold text-gray-300">{holding.symbol[0]}</span>
+        </div>
+        <div>
+          <div className="text-sm font-medium text-gray-100">{holding.name || holding.symbol}</div>
+          <div className="text-xs text-gray-400">{holding.symbol}</div>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="text-lg font-semibold text-gray-100">
+          {formatCurrency(holding.currentPrice, holding.currency || "USD")}
+        </div>
+        <div className={cn(
+          'text-sm font-medium',
+          getChangeColor(holding.pnl)
+        )}>
+          {formatCurrency(holding.pnl, holding.currency || "USD")} ({formatPercent(holding.pnlPercent)})
+        </div>
+      </div>
+      {data?.history && data.history.length > 0 && (
+        <div className="h-16 w-full">
+          <MiniChart data={data.history.slice(-50)} /> {/* Last 50 points */}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Mini Chart Component
+function MiniChart({ data }: { data: any[] }) {
+  const points = data.map((d, i) => `${(i / data.length) * 100} ${(1 - (d.close - Math.min(...data.map(d => d.close))) / (Math.max(...data.map(d => d.close)) - Math.min(...data.map(d => d.close)))) * 100}`);
+  const pathData = `M${points.join(' L')}`;
+
+  return (
+    <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <path d={pathData} fill="none" stroke="#2563EB" strokeWidth="2" />
+    </svg>
+  );
+}
+
+// Company Details Drawer Component
+function CompanyDetailsDrawer({ holding, onClose }: { holding: PortfolioHolding; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState('summary');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -410,42 +488,72 @@ function CompanyDetailsModal({ holding, onClose }: { holding: PortfolioHolding; 
     fetchDetails();
   }, [holding.symbol]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-dark-800 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-100">{holding.name || holding.symbol}</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-200">✕</button>
-          </div>
-          {loading ? (
-            <div>Loading...</div>
-          ) : (
-            <div className="space-y-4">
-              {data?.quote && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-100">Quote</h3>
-                  <p>Price: {formatCurrency(data.quote.price)}</p>
-                  <p>Change: {formatCurrency(data.quote.change)} ({formatPercent(data.quote.changePercent)})</p>
-                </div>
-              )}
-              {data?.info && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-100">Company Info</h3>
-                  <p>{data.info.description}</p>
-                  <p>Sector: {data.info.sector}</p>
-                  <p>Industry: {data.info.industry}</p>
-                </div>
-              )}
+  const tabs = [
+    { id: 'summary', label: 'Summary' },
+    { id: 'news', label: 'News' },
+    { id: 'chart', label: 'Chart' },
+    { id: 'stats', label: 'Statistics' },
+    { id: 'history', label: 'Historical' },
+    { id: 'financials', label: 'Financials' },
+    { id: 'analysis', label: 'Analysis' },
+  ];
 
-              {data?.history && data.history.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-100">Price History</h3>
-                  <div className="h-64">
-                    {/* Simple chart placeholder */}
-                    <p>History data available. Chart implementation needed.</p>
-                  </div>
+  return (
+    <div className="fixed inset-y-0 right-0 z-50 w-96 bg-dark-800 border-l border-dark-700 shadow-xl transform transition-transform duration-300 ease-in-out">
+      <div className="flex flex-col h-full">
+        <div className="flex justify-between items-center p-4 border-b border-dark-700">
+          <h2 className="text-lg font-bold text-gray-100">{holding.name || holding.symbol}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">✕</button>
+        </div>
+        <div className="flex border-b border-dark-700">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex-1 py-2 text-sm font-medium transition-colors',
+                activeTab === tab.id ? 'text-accent-green border-b-2 border-accent-green' : 'text-gray-400 hover:text-gray-200'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {loading ? (
+            <div className="text-center text-gray-400">Loading...</div>
+          ) : (
+            <div>
+              {activeTab === 'summary' && (
+                <div className="space-y-4">
+                  {data?.quote && (
+                    <div>
+                      <p className="text-2xl font-bold text-gray-100">{formatCurrency(data.quote.price)}</p>
+                      <p className={cn('text-sm', getChangeColor(data.quote.change))}>
+                        {formatCurrency(data.quote.change)} ({formatPercent(data.quote.changePercent)})
+                      </p>
+                    </div>
+                  )}
+                  {data?.info && (
+                    <div>
+                      <p className="text-sm text-gray-300">{data.info.description?.slice(0, 200)}...</p>
+                      <div className="mt-2 space-y-1 text-xs text-gray-400">
+                        <p>Sector: {data.info.sector}</p>
+                        <p>Industry: {data.info.industry}</p>
+                        <p>Employees: {data.info.employees}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              )}
+              {activeTab === 'chart' && data?.history && (
+                <div className="h-64">
+                  <MiniChart data={data.history} />
+                </div>
+              )}
+              {/* Add other tabs as needed */}
+              {activeTab !== 'summary' && activeTab !== 'chart' && (
+                <div className="text-center text-gray-400">Content for {activeTab} coming soon.</div>
               )}
             </div>
           )}
