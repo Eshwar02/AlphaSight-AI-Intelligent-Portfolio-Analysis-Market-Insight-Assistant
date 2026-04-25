@@ -25,6 +25,9 @@ export function PortfolioView() {
   const [editingHolding, setEditingHolding] =
     useState<PortfolioHolding | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedHolding, setSelectedHolding] = useState<PortfolioHolding | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [hoveredHolding, setHoveredHolding] = useState<PortfolioHolding | null>(null);
 
   const fetchHoldings = useCallback(async () => {
     try {
@@ -42,6 +45,9 @@ export function PortfolioView() {
 
   useEffect(() => {
     fetchHoldings();
+    // Real-time updates every 30 seconds
+    const interval = setInterval(fetchHoldings, 30000);
+    return () => clearInterval(interval);
   }, [fetchHoldings]);
 
   async function handleDelete(id: string) {
@@ -70,6 +76,15 @@ export function PortfolioView() {
 
   function handleSaved() {
     fetchHoldings();
+  }
+
+  function handleHoldingClick(holding: PortfolioHolding) {
+    setSelectedHolding(holding);
+    setDetailsModalOpen(true);
+  }
+
+  function handleHoldingHover(holding: PortfolioHolding | null) {
+    setHoveredHolding(holding);
   }
 
   const totalValue = holdings.reduce((s, h) => s + h.currentValue, 0);
@@ -178,13 +193,16 @@ export function PortfolioView() {
                   <AnimatePresence>
                     {holdings.map((h) => (
                       <motion.tr
-                        key={h.id}
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        className="border-b border-dark-700/50 hover:bg-dark-850 transition-colors"
-                      >
+                         key={h.id}
+                         layout
+                         initial={{ opacity: 0 }}
+                         animate={{ opacity: 1 }}
+                         exit={{ opacity: 0, x: -20 }}
+                         className="border-b border-dark-700/50 hover:bg-dark-850 transition-colors cursor-pointer"
+                         onClick={() => handleHoldingClick(h)}
+                         onMouseEnter={() => handleHoldingHover(h)}
+                         onMouseLeave={() => handleHoldingHover(null)}
+                       >
                         <td className="px-4 py-3"><div><p className="font-semibold text-gray-100">{h.name || h.symbol}</p><p className="text-xs text-dark-400">{h.symbol}</p></div></td>
                         <td className="px-4 py-3 text-right text-gray-300">
                           {h.quantity}
@@ -254,13 +272,16 @@ export function PortfolioView() {
               <AnimatePresence>
                 {holdings.map((h) => (
                   <motion.div
-                    key={h.id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="rounded-xl border border-dark-700 bg-dark-800 p-4"
-                  >
+                     key={h.id}
+                     layout
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     exit={{ opacity: 0, x: -20 }}
+                     className="rounded-xl border border-dark-700 bg-dark-800 p-4 cursor-pointer"
+                     onClick={() => handleHoldingClick(h)}
+                     onMouseEnter={() => handleHoldingHover(h)}
+                     onMouseLeave={() => handleHoldingHover(null)}
+                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <span className="font-semibold text-gray-100 text-base">
@@ -333,6 +354,27 @@ export function PortfolioView() {
         )}
       </div>
 
+      {/* Hover Tooltip */}
+      {hoveredHolding && (
+        <div className="fixed z-50 bg-dark-800 border border-dark-700 rounded-lg p-3 shadow-lg max-w-xs">
+          <div className="text-sm font-medium text-gray-100">{hoveredHolding.name || hoveredHolding.symbol}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            Price: {formatCurrency(hoveredHolding.currentPrice, hoveredHolding.currency || "USD")}
+          </div>
+          <div className="text-xs text-gray-400">
+            Change: {formatCurrency(hoveredHolding.pnl, hoveredHolding.currency || "USD")} ({formatPercent(hoveredHolding.pnlPercent)})
+          </div>
+        </div>
+      )}
+
+      {/* Company Details Modal */}
+      {detailsModalOpen && selectedHolding && (
+        <CompanyDetailsModal
+          holding={selectedHolding}
+          onClose={() => setDetailsModalOpen(false)}
+        />
+      )}
+
       <AddHoldingModal
         open={modalOpen}
         onClose={() => {
@@ -342,6 +384,73 @@ export function PortfolioView() {
         onSaved={handleSaved}
         editingHolding={editingHolding}
       />
+    </div>
+  );
+}
+
+// Company Details Modal Component
+function CompanyDetailsModal({ holding, onClose }: { holding: PortfolioHolding; onClose: () => void }) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDetails = async () => {
+      try {
+        const res = await fetch(`/api/stock/details/${holding.symbol}`);
+        if (res.ok) {
+          const details = await res.json();
+          setData(details);
+        }
+      } catch (err) {
+        console.error("Failed to fetch details:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDetails();
+  }, [holding.symbol]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-dark-800 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-100">{holding.name || holding.symbol}</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-200">✕</button>
+          </div>
+          {loading ? (
+            <div>Loading...</div>
+          ) : (
+            <div className="space-y-4">
+              {data?.quote && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-100">Quote</h3>
+                  <p>Price: {formatCurrency(data.quote.price)}</p>
+                  <p>Change: {formatCurrency(data.quote.change)} ({formatPercent(data.quote.changePercent)})</p>
+                </div>
+              )}
+              {data?.info && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-100">Company Info</h3>
+                  <p>{data.info.description}</p>
+                  <p>Sector: {data.info.sector}</p>
+                  <p>Industry: {data.info.industry}</p>
+                </div>
+              )}
+
+              {data?.history && data.history.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-100">Price History</h3>
+                  <div className="h-64">
+                    {/* Simple chart placeholder */}
+                    <p>History data available. Chart implementation needed.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
