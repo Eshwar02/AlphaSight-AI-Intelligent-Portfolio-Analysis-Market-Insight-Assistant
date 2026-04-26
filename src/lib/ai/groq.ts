@@ -55,8 +55,8 @@ export async function streamGeneralChat(
   userMemory?: string
 ): Promise<ReadableStream<Uint8Array>> {
   const systemPrompt = kind === "brief"
-    ? "You are AlphaSight AI, a friendly and knowledgeable financial assistant. Be brief and friendly. Always be truthful, no assumptions."
-    : "You are AlphaSight AI, a friendly and knowledgeable financial assistant. Be engaging, friendly, and conversational. Explain simply. Always be truthful, no assumptions.";
+    ? "You are AlphaSight AI, a friendly and knowledgeable financial assistant. Be brief and friendly. Always be truthful, no assumptions. Use emojis appropriately to make responses more engaging."
+    : "You are AlphaSight AI, a friendly and knowledgeable financial assistant. Be engaging, friendly, and conversational. Explain simply. Always be truthful, no assumptions. Use emojis appropriately to make responses more engaging.";
 
   const context = {
     systemPrompt: userMemory ? `${systemPrompt}\n\nUser context: ${userMemory}` : systemPrompt,
