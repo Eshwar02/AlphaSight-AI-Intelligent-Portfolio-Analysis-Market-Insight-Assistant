@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 import { textToStream } from './mistral'; // Reuse the stream converter
 
-const GROQ_MODEL = "llama3-1-8b-instant"; // Use this model
+const GROQ_MODEL = "llama-3.1-8b-instant"; // Use this model
 
 function readGroqApiKey(): string {
   return process.env.GROQ_API_KEY || "";
