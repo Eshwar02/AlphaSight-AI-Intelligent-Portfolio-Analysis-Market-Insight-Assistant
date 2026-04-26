@@ -3,7 +3,7 @@ import { yahoo } from "@/lib/stock/yahoo";
 import { stockCache, CACHE_TTL } from "./cache";
 
 const MARKETAUX_API_KEY = process.env.MARKETAUX_API_KEY;
-const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
+const NEWSAPI_API_KEY = process.env.NEWSAPI_API_KEY || process.env.NEWSDATA_API_KEY;
 const MAX_NEWS_ITEMS = 12;
 
 interface NewsdataArticle {
@@ -15,25 +15,25 @@ interface NewsdataArticle {
 }
 
 /**
- * Fetch news from NewsData.io API
+ * Fetch news from NewsAPI.org API
  */
 async function fetchNewsdataNews(symbol: string, companyName: string): Promise<NewsItem[]> {
-  if (!NEWSDATA_API_KEY) return [];
+  if (!NEWSAPI_API_KEY) return [];
 
   try {
     const query = companyName || symbol.replace(/\.(NS|BO)$/, '');
-    const url = `https://newsdata.io/api/1/news?apikey=${NEWSDATA_API_KEY}&q=${encodeURIComponent(query)}&language=en&category=business&size=5`;
+    const url = `https://newsapi.org/v2/everything?apiKey=${NEWSAPI_API_KEY}&q=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=5`;
     const res = await fetch(url, { next: { revalidate: 300 } });
     if (!res.ok) return [];
 
     const data = await res.json();
-    if (!data.results || !Array.isArray(data.results)) return [];
+    if (!data.articles || !Array.isArray(data.articles)) return [];
 
-    return data.results.map((article: NewsdataArticle) => ({
+    return data.articles.map((article: any) => ({
       title: article.title || '',
-      url: article.link || '',
-      source: article.source_name || 'NewsData',
-      publishedAt: article.pubDate || new Date().toISOString(),
+      url: article.url || '',
+      source: article.source?.name || 'NewsAPI',
+      publishedAt: article.publishedAt || new Date().toISOString(),
       summary: article.description || article.title || '',
     }));
   } catch {
