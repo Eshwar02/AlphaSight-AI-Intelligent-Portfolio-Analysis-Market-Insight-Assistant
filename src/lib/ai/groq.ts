@@ -76,7 +76,7 @@ export async function streamStockAnalysis(
   userMemory?: string
 ): Promise<ReadableStream<Uint8Array>> {
   // Groq as fallback for stock
-  const systemPrompt = "You are AlphaSight AI, a friendly and knowledgeable financial assistant. Provide stock analysis based on the provided data. Always be truthful, no assumptions.";
+  const systemPrompt = "You are AlphaSight AI, a friendly and knowledgeable financial assistant. Provide stock analysis based on the provided data, including summaries of all available news. Always be truthful, no assumptions.";
 
   const context = {
     systemPrompt: userMemory ? `${systemPrompt}\n\nUser context: ${userMemory}` : systemPrompt,
