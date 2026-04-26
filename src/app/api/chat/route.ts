@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
 
     if (!stockQuery) {
       if (isGreeting(incomingMessage)) {
-        generalKind = "brief";
+        generalKind = "normal";
         console.debug("[chat-api] greeting shortcut");
       } else if (looksLikeGeneral) {
         console.debug("[chat-api] general shortcut (skip classifier)");
