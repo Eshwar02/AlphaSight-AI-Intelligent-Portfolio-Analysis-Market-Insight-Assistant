@@ -51,7 +51,7 @@ const stockCache = new MemoryCache();
 const CACHE_TTL = {
   QUOTE: 60,        // 1 minute - quotes change frequently
   HISTORY: 300,     // 5 minutes - historical data is stable
-  NEWS: 600,        // 10 minutes - news doesn't change every second
+  NEWS: 120,        // 2 minutes - for more real-time news
   COMPANY_INFO: 3600, // 1 hour - company info is very stable
 } as const;
 
