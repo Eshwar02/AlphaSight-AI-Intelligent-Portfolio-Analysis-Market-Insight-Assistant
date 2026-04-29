@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Providers } from '@/components/providers';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 
 const inter = Inter({
@@ -103,6 +104,7 @@ export default function RootLayout({
         className={`${inter.variable} font-sans bg-white text-gray-900 dark:bg-dark-900 dark:text-gray-300 transition-colors duration-300`}
       >
         <Providers>{children}</Providers>
+        <SpeedInsights />
       </body>
     </html>
   );
