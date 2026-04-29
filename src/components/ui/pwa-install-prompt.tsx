@@ -141,7 +141,7 @@ export function PWAInstallPrompt() {
           </Button>
           <Button
             onClick={handleDismiss}
-            variant="outline"
+            variant="ghost"
             size="sm"
             className="text-xs"
           >
