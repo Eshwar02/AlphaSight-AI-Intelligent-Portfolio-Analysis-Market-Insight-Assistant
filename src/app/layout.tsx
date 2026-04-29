@@ -23,10 +23,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: '/logo.svg', sizes: 'any', type: 'image/svg+xml' },
       { url: '/icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
       { url: '/icon-512.svg', sizes: '512x512', type: 'image/svg+xml' },
     ],
-    shortcut: '/icon-192.svg',
+    shortcut: '/logo.svg',
     apple: '/apple-touch-icon.svg',
   },
   other: {
@@ -98,6 +99,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <script dangerouslySetInnerHTML={{ __html: swRegisterScript }} />
       </head>
