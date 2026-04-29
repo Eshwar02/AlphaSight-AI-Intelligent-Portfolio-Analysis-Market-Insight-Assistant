@@ -13,10 +13,33 @@ export const metadata: Metadata = {
   title: 'AlphaSight AI',
   description:
     'AI-powered stock analysis assistant. Get real-time insights, portfolio tracking, and market intelligence.',
+  manifest: '/manifest.json',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+  },
+  themeColor: '#1f2937',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'AlphaSight AI',
+  },
   icons: {
-    icon: '/logo.svg',
-    shortcut: '/logo.svg',
-    apple: '/logo.svg',
+    icon: [
+      { url: '/icon-192.svg', sizes: '192x192', type: 'image/svg+xml' },
+      { url: '/icon-512.svg', sizes: '512x512', type: 'image/svg+xml' },
+    ],
+    shortcut: '/icon-192.svg',
+    apple: '/apple-touch-icon.svg',
+  },
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-title': 'AlphaSight AI',
+    'application-name': 'AlphaSight AI',
+    'msapplication-TileColor': '#1f2937',
+    'msapplication-config': '/browserconfig.xml',
   },
 };
 
@@ -34,6 +57,36 @@ const themeInitScript = `
 })();
 `;
 
+// Service Worker registration script
+const swRegisterScript = `
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js')
+      .then(function(registration) {
+        console.log('[PWA] Service Worker registered successfully:', registration.scope);
+
+        // Handle updates
+        registration.addEventListener('updatefound', function() {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', function() {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New content is available, notify user
+                if (confirm('New version available! Reload to update?')) {
+                  window.location.reload();
+                }
+              }
+            });
+          }
+        });
+      })
+      .catch(function(error) {
+        console.log('[PWA] Service Worker registration failed:', error);
+      });
+  });
+}
+`;
+
 export default function RootLayout({
   children,
 }: {
@@ -43,6 +96,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: swRegisterScript }} />
       </head>
       <body
         suppressHydrationWarning
