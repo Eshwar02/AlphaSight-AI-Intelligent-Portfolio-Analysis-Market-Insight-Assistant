@@ -16,12 +16,6 @@ export const metadata: Metadata = {
   description:
     'AI-powered stock analysis assistant. Get real-time insights, portfolio tracking, and market intelligence.',
   manifest: '/manifest.json',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
-  themeColor: '#1f2937',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -43,6 +37,13 @@ export const metadata: Metadata = {
     'msapplication-TileColor': '#1f2937',
     'msapplication-config': '/browserconfig.xml',
   },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#1f2937',
 };
 
 // Inline script runs before hydration so the correct `dark` class is on <html>
