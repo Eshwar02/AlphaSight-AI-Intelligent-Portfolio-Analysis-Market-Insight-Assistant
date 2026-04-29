@@ -38,21 +38,21 @@ const suggestions = [
 ];
 
 const greetings = [
-  "Hello {name}, ready to dive into the markets?",
-  "Welcome back {name}, what's on your mind today?",
-  "Hey {name}, let's analyze some stocks!",
-  "Good to see you {name}, how can I assist with your portfolio?",
-  "Hi {name}, excited to help with your financial queries!",
-  "Greetings {name}, shall we explore market insights?",
-  "Hey there {name}, what's your investment question?",
-  "Welcome {name}, let's make some smart investment decisions!",
-  "Hello again {name}, ready for market analysis?",
-  "Hi {name}, let's uncover some stock opportunities!",
+  "Hi {name}, ready for market insights?",
+  "Welcome {name}, let's analyze stocks",
+  "Hey {name}, stock questions?",
+  "Hello {name}, market analysis?",
+  "Hi {name}, portfolio help?",
+  "Welcome {name}, investment queries?",
+  "Hey {name}, stock analysis?",
+  "Hello {name}, market insights?",
+  "Hi {name}, trading questions?",
+  "Welcome {name}, stock research?",
 ];
 
 export function WelcomeScreen({ onSendPrompt }: WelcomeScreenProps) {
   const storedName = typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
-  const initialGreeting = storedName ? `Hello ${storedName}, ready to dive into the markets?` : "Hello, how can I help you today?";
+  const initialGreeting = storedName ? `Hi ${storedName}, market insights?` : "Hi, stock questions?";
   const [greeting, setGreeting] = useState(initialGreeting);
   const [name, setName] = useState(storedName || "");
 

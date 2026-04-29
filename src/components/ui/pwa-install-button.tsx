@@ -51,7 +51,7 @@ export function PWAInstallButton() {
       setDeferredPrompt(e);
 
       // Show button after a short delay
-      setTimeout(() => setIsVisible(true), 2000);
+      setTimeout(() => setIsVisible(true), 500);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -62,7 +62,7 @@ export function PWAInstallButton() {
                           (window.navigator as any).standalone === true;
 
       if (!isStandalone) {
-        setTimeout(() => setIsVisible(true), 3000);
+        setTimeout(() => setIsVisible(true), 500);
       }
     };
 
@@ -102,8 +102,9 @@ export function PWAInstallButton() {
     localStorage.setItem('pwa-install-button-dismissed', 'true');
   };
 
-  // Don't show if not mobile, dismissed, or not available
-  if (!isMobile || isDismissed || !isVisible) return null;
+  // Don't show if dismissed, or not available (temporarily show on all devices for debugging)
+  console.log('[PWA Debug] isDismissed:', isDismissed, 'isVisible:', isVisible, 'isMobile:', isMobile);
+  if (isDismissed || !isVisible) return null;
 
   return (
     <div className="relative">
