@@ -8,6 +8,7 @@ import { useAppStore } from '@/stores/app-store';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { ThemeSwitch } from '@/components/ui/theme-switch-button';
+import { PWAInstallButton } from '@/components/ui/pwa-install-button';
 
 export function Header() {
   const router = useRouter();
@@ -104,8 +105,9 @@ export function Header() {
         <span className="text-dark-400">Pro</span>
       </button>
 
-      {/* ── Right: theme toggle + user avatar + menu ────────── */}
+      {/* ── Right: PWA install + theme toggle + user avatar + menu ────────── */}
       <div className="flex items-center gap-2">
+        <PWAInstallButton />
         <ThemeSwitch />
         <div ref={menuRef} className="relative">
           <button
