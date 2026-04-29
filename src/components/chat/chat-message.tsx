@@ -139,13 +139,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             )}
             {!hasStreamingText && isStreaming && <StreamingDots />}
             {!hasContent && !isStreaming && (
-              <div className="text-[15px] leading-7 text-gray-400 italic">
-                {EMPTY_RESPONSE_FALLBACK}
-              </div>
-            )}
-            {!hasStreamingText && isStreaming && <StreamingDots />}
-            {!hasContent && !isStreaming && (
-              <div className="text-[15px] leading-7 text-gray-500 dark:text-gray-400 italic">
+              <div className="text-[15px] leading-7 text-gray-400 dark:text-gray-400 italic">
                 {EMPTY_RESPONSE_FALLBACK}
               </div>
             )}

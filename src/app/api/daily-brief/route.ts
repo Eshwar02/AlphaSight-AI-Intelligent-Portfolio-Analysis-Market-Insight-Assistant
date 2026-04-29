@@ -183,7 +183,21 @@ async function generateBriefForUser(
   }
 
   // Build comprehensive prompt for AI
-  let prompt = `Generate a professional-grade daily portfolio brief for the user.\n\n`;
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const currentTime = now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+
+  let prompt = `Generate a professional-grade daily portfolio brief for the user as of ${currentDate} at ${currentTime}.\n\n`;
+  prompt += `Include relevant dates and timestamps in the analysis where appropriate for real-time context.\n\n`;
 
   prompt += `## Portfolio Data\n`;
   prompt += `- Total Value: $${snapshot.totalValue.toFixed(2)}\n`;
